@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>コイン瓶ミニゲーム</title>
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="game-container"></div>
+      <aside id="ui-panel" class="panel">
+        <section class="status-block">
+          <h1>コインの記録</h1>
+          <p class="hint" id="hint-text">今日も少しずつ積み上げましょう。</p>
+          <div class="counter">
+            <span>現在の枚数</span>
+            <strong id="coin-count">0</strong>
+            <span class="separator">/ 100</span>
+          </div>
+          <button id="record-button" class="primary">記録</button>
+        </section>
+        <section class="shelf-block">
+          <div class="shelf-header">
+            <h2>棚の成果</h2>
+            <div class="pager">
+              <button id="shelf-prev" class="ghost" aria-label="前のページ">◀</button>
+              <span id="shelf-page">1 / 1</span>
+              <button id="shelf-next" class="ghost" aria-label="次のページ">▶</button>
+            </div>
+          </div>
+          <div id="shelf-grid" class="shelf-grid"></div>
+        </section>
+      </aside>
+    </div>
+
+    <div id="dialog-backdrop" class="dialog-backdrop hidden" role="dialog" aria-modal="true">
+      <div class="dialog">
+        <header>
+          <h2>記録を追加</h2>
+        </header>
+        <form id="record-form">
+          <label class="field">
+            <span>タイトル</span>
+            <input id="record-title" type="text" placeholder="今日のがんばり" maxlength="32" required />
+          </label>
+          <div class="field sliders">
+            <label>
+              <span>効果</span>
+              <input type="range" min="0" max="100" value="30" data-weight="1.2" />
+            </label>
+            <label>
+              <span>時間</span>
+              <input type="range" min="0" max="100" value="30" data-weight="1.0" />
+            </label>
+            <label>
+              <span>努力</span>
+              <input type="range" min="0" max="100" value="30" data-weight="1.5" />
+            </label>
+          </div>
+          <p class="field result">推定コイン：<strong id="record-preview">0枚</strong></p>
+          <footer>
+            <button type="button" id="dialog-cancel" class="ghost">キャンセル</button>
+            <button type="submit" class="primary">記録する</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <div id="full-toast" class="toast hidden">瓶が満杯になりました！棚に保存します。</div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
