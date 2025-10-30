@@ -10,24 +10,28 @@ export class CoinFactory {
   spawnCoins(count: number, interval = 90): Promise<void> {
     if (count <= 0) return Promise.resolve();
     return new Promise((resolve) => {
-      let spawned = 0;
-      const timer = this.scene.time.addEvent({
-        delay: interval,
-        repeat: count - 1,
-        callback: () => {
-          this.createCoin();
-          spawned += 1;
-          if (spawned >= count) {
-            resolve();
-          }
+      let remaining = count;
+      let timer: Phaser.Time.TimerEvent | null = null;
+
+      const spawnOne = () => {
+        this.createCoin();
+        remaining -= 1;
+
+        if (remaining <= 0) {
+          resolve();
+          timer?.remove(false);
         }
-      });
+      };
+
       // trigger immediately for first coin
-      this.createCoin();
-      spawned += 1;
-      if (count === 1) {
-        resolve();
-        timer.remove(false);
+      spawnOne();
+
+      if (remaining > 0) {
+        timer = this.scene.time.addEvent({
+          delay: interval,
+          repeat: remaining - 1,
+          callback: spawnOne
+        });
       }
     });
   }
