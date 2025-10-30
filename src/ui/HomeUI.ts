@@ -1,6 +1,7 @@
 import type { ArchiveEntry } from '@/models/archive';
 import { ARCHIVE_PAGE_SIZE } from '@/models/archive';
 import { gameState } from '@/services/GameStateManager';
+import { debugLogger } from '@/services/DebugLogger';
 import { RecordDialog, type RecordResult } from '@/ui/RecordDialog';
 
 interface HomeUIOptions {
@@ -11,6 +12,7 @@ interface HomeUIOptions {
 export class HomeUI {
   private coinCountLabel = document.getElementById('coin-count') as HTMLElement;
   private recordButton = document.getElementById('record-button') as HTMLButtonElement;
+  private downloadLogButton = document.getElementById('download-log-button') as HTMLButtonElement;
   private hintText = document.getElementById('hint-text') as HTMLElement;
   private toast = document.getElementById('full-toast') as HTMLElement;
   private shelfGrid = document.getElementById('shelf-grid') as HTMLElement;
@@ -27,7 +29,13 @@ export class HomeUI {
     this.dialog = new RecordDialog((result) => this.handleRecordSubmit(result));
 
     this.recordButton.addEventListener('click', () => {
+      debugLogger.log('Record button clicked.');
       this.dialog.show(this.lastRecordTitle ?? undefined);
+    });
+
+    this.downloadLogButton.addEventListener('click', () => {
+      debugLogger.log('Debug log download requested.');
+      debugLogger.download();
     });
 
     this.prevButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
@@ -35,6 +43,7 @@ export class HomeUI {
 
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !this.dialog.isVisible()) {
+        debugLogger.log('Enter key pressed. Adding single coin.');
         this.options.onKeyboardCoin();
       }
     });
@@ -48,14 +57,17 @@ export class HomeUI {
   }
 
   private handleRecordSubmit(result: RecordResult): void {
+    debugLogger.log('Record dialog submitted.', { title: result.title, coins: result.coins });
     this.lastRecordTitle = result.title;
     const available = gameState.getCapacity() - gameState.getCoinCount();
     const coins = Math.min(result.coins, Math.max(0, available));
     if (coins > 0) {
       gameState.setPendingTitle(result.title);
+      debugLogger.log('Submitting coins to queue.', { coins });
       this.options.onRecord(coins);
     } else {
       gameState.setPendingTitle(null);
+      debugLogger.log('No coins submitted due to jar capacity.');
     }
   }
 
@@ -68,12 +80,20 @@ export class HomeUI {
         ? '半分を超えました。良いペースです。'
         : '今日も少しずつ積み上げましょう。';
     this.hintText.textContent = hint;
+    debugLogger.log('Coin count label updated.', { count, hint });
   }
 
   private handleJarFilled(entry: ArchiveEntry): void {
     this.showToast();
     this.currentPage = 0;
     this.refreshArchives([entry, ...this.archives]);
+    debugLogger.log('Handled jar filled event.', {
+      entry: {
+        id: entry.id,
+        title: entry.title,
+        createdAt: entry.createdAt
+      }
+    });
   }
 
   private refreshArchives(entries: ArchiveEntry[]): void {
