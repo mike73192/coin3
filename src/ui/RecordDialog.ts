@@ -1,4 +1,5 @@
 import { gameState } from '@/services/GameStateManager';
+import { debugLogger } from '@/services/DebugLogger';
 
 export interface RecordResult {
   title: string;
@@ -32,9 +33,13 @@ export class RecordDialog {
       const result = this.calculate();
       this.onSubmit(result);
       this.hide();
+      debugLogger.log('Record dialog form submitted.', { result });
     });
 
-    this.cancelButton.addEventListener('click', () => this.hide());
+    this.cancelButton.addEventListener('click', () => {
+      debugLogger.log('Record dialog cancelled.');
+      this.hide();
+    });
     this.sliders.forEach((slider) => slider.addEventListener('input', () => this.updatePreview()));
     this.updatePreview();
   }
@@ -45,6 +50,7 @@ export class RecordDialog {
     this.titleInput.focus();
     this.updatePreview();
     this.visible = true;
+    debugLogger.log('Record dialog shown.', { presetTitle: presetTitle ?? null });
   }
 
   hide(): void {
@@ -55,6 +61,7 @@ export class RecordDialog {
     });
     this.updatePreview();
     this.visible = false;
+    debugLogger.log('Record dialog hidden.');
   }
 
   isVisible(): boolean {
@@ -87,5 +94,6 @@ export class RecordDialog {
     const available = gameState.getCapacity() - gameState.getCoinCount();
     const capped = Math.min(currentCoins, Math.max(0, available));
     this.preview.textContent = `${capped}枚 (上限 ${MAX_COINS_PER_RECORD}枚)`;
+    debugLogger.log('Record dialog preview updated.', { currentCoins, capped, available });
   }
 }

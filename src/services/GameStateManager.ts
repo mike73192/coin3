@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { ArchiveEntry } from '@/models/archive';
+import { debugLogger } from '@/services/DebugLogger';
 
 const STORAGE_KEY = 'coin3-archives';
 
@@ -47,6 +48,7 @@ export class GameStateManager {
 
   addCoins(amount: number): { added: number; overflow: number; jarFilled: boolean } {
     if (amount <= 0) {
+      debugLogger.log('Ignored non-positive coin addition.', { amount });
       return { added: 0, overflow: 0, jarFilled: false };
     }
 
@@ -56,11 +58,20 @@ export class GameStateManager {
 
     this.coins += added;
     this.emitter.emit('coinsChanged', this.coins);
+    debugLogger.log('Coins added to jar.', { amount, added, overflow, total: this.coins });
 
     if (this.coins >= this.capacity) {
       const entry = this.createArchiveEntry();
       this.archives = [entry, ...this.archives];
       this.persistArchives();
+      debugLogger.log('Jar filled. Archive entry created.', {
+        entry: {
+          id: entry.id,
+          title: entry.title,
+          createdAt: entry.createdAt
+        },
+        overflow
+      });
       this.emitter.emit('jarFilled', entry, overflow);
       this.emitter.emit('archivesUpdated', this.getArchives());
       this.resetCoins(0);
@@ -73,12 +84,14 @@ export class GameStateManager {
   resetCoins(initial = 0): void {
     this.coins = Math.max(0, Math.min(initial, this.capacity));
     this.emitter.emit('coinsChanged', this.coins);
+    debugLogger.log('Coin count reset.', { value: this.coins });
   }
 
   private createArchiveEntry(): ArchiveEntry {
     const now = new Date();
     const title = this.pendingArchiveTitle?.trim() || `${now.toLocaleDateString('ja-JP')}の成果`;
     this.pendingArchiveTitle = null;
+    debugLogger.log('Preparing archive entry.', { title });
     return {
       id: `${now.getTime()}`,
       title,
