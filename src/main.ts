@@ -15,8 +15,6 @@ const computeSize = () => {
 
 const size = computeSize();
 
-const mainScene = new MainScene();
-
 const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-container',
@@ -30,17 +28,17 @@ const gameConfig: Phaser.Types.Core.GameConfig = {
       debug: false
     }
   },
-  scene: [mainScene]
+  scene: [new MainScene()]
 };
 
 debugLogger.log('Bootstrapping application.');
 
 const game = new Phaser.Game(gameConfig);
-const scene = mainScene;
 
 debugLogger.log('Phaser game initialized.');
 
 let queue = Promise.resolve();
+let scene: MainScene | null = null;
 
 const setupHomeUI = (): void => {
   debugLogger.log('Initializing HomeUI instance.');
@@ -51,10 +49,21 @@ const setupHomeUI = (): void => {
   debugLogger.log('HomeUI ready.');
 };
 
-if (scene.sys.settings.status >= Phaser.Scenes.RUNNING) {
-  setupHomeUI();
+const bootstrapScene = (): void => {
+  scene = game.scene.getScene(SCENE_KEY) as MainScene;
+  const mainScene = scene;
+
+  if (mainScene.sys.settings.status >= Phaser.Scenes.RUNNING) {
+    setupHomeUI();
+  } else {
+    mainScene.events.once(Phaser.Scenes.Events.CREATE, setupHomeUI);
+  }
+};
+
+if (game.isBooted) {
+  bootstrapScene();
 } else {
-  scene.events.once(Phaser.Scenes.Events.CREATE, setupHomeUI);
+  game.events.once(Phaser.Core.Events.BOOT, bootstrapScene);
 }
 
 function enqueueAddition(amount: number): void {
@@ -68,14 +77,19 @@ function enqueueAddition(amount: number): void {
 async function processAddition(amount: number): Promise<void> {
   let remaining = amount;
   debugLogger.log('Processing coin addition.', { amount });
+  const mainScene = scene;
+  if (!mainScene) {
+    debugLogger.log('Main scene is not ready yet.');
+    return;
+  }
   while (remaining > 0) {
     const { added, overflow, jarFilled } = gameState.addCoins(remaining);
     if (added > 0) {
-      await scene.enqueueCoins(added);
+      await mainScene.enqueueCoins(added);
     }
     if (jarFilled) {
       debugLogger.log('Awaiting jar readiness after fill.');
-      await scene.waitForJarReady();
+      await mainScene.waitForJarReady();
     }
     remaining = overflow;
   }
