@@ -14,6 +14,7 @@ const computeSize = () => {
 };
 
 const size = computeSize();
+const mainSceneInstance = new MainScene();
 
 const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -28,7 +29,7 @@ const gameConfig: Phaser.Types.Core.GameConfig = {
       debug: false
     }
   },
-  scene: [new MainScene()]
+  scene: [mainSceneInstance]
 };
 
 debugLogger.log('Bootstrapping application.');
@@ -50,10 +51,19 @@ const setupHomeUI = (): void => {
 };
 
 const bootstrapScene = (): void => {
-  scene = game.scene.getScene(SCENE_KEY) as MainScene;
-  const mainScene = scene;
+  const mainScene = (game.scene.getScene(SCENE_KEY) as MainScene | undefined) ??
+    (mainSceneInstance.sys ? mainSceneInstance : undefined);
 
-  if (mainScene.sys.settings.status >= Phaser.Scenes.RUNNING) {
+  if (!mainScene) {
+    debugLogger.log('Main scene not yet available during bootstrap. Retrying...');
+    window.requestAnimationFrame(bootstrapScene);
+    return;
+  }
+
+  scene = mainScene;
+  const status = mainScene.sys?.settings?.status ?? Phaser.Scenes.INIT;
+
+  if (status >= Phaser.Scenes.RUNNING) {
     setupHomeUI();
   } else {
     mainScene.events.once(Phaser.Scenes.Events.CREATE, setupHomeUI);
