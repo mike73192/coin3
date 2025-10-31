@@ -15,6 +15,8 @@ const computeSize = () => {
 
 const size = computeSize();
 
+const mainScene = new MainScene();
+
 const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-container',
@@ -24,17 +26,17 @@ const gameConfig: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'matter',
     matter: {
-      gravity: { y: 1 },
+      gravity: { x: 0, y: 1 },
       debug: false
     }
   },
-  scene: [MainScene]
+  scene: [mainScene]
 };
 
 debugLogger.log('Bootstrapping application.');
 
 const game = new Phaser.Game(gameConfig);
-const scene = game.scene.getScene(SCENE_KEY) as MainScene;
+const scene = mainScene;
 
 debugLogger.log('Phaser game initialized.');
 

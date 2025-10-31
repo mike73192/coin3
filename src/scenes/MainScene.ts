@@ -60,7 +60,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   private createCoinTexture(): void {
-    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+    const graphics = this.add.graphics({ x: 0, y: 0 });
+    graphics.setVisible(false);
     graphics.fillStyle(0xffd966, 1);
     graphics.fillCircle(40, 40, 36);
     graphics.lineStyle(6, 0xffc531, 1);
@@ -82,20 +83,22 @@ export class MainScene extends Phaser.Scene {
     const glass = this.add.graphics();
     glass.lineStyle(8, BOTTLE_STROKE, 0.8);
     glass.fillStyle(BOTTLE_COLOR, 0.15);
-    glass.beginPath();
-    glass.moveTo(centerX - neckWidth / 2, topY + 40);
-    glass.quadraticCurveTo(centerX - neckWidth / 2, topY + 10, centerX - neckWidth / 2 + 24, topY);
-    glass.quadraticCurveTo(centerX - bottleWidth / 2, topY - 40, centerX - bottleWidth / 2, topY + 40);
-    glass.lineTo(centerX - bottleWidth / 2 + 16, bottomY - 24);
-    glass.quadraticCurveTo(centerX - bottleWidth / 2 + 32, bottomY, centerX - bottleWidth / 2 + 48, bottomY);
-    glass.lineTo(centerX + bottleWidth / 2 - 48, bottomY);
-    glass.quadraticCurveTo(centerX + bottleWidth / 2 - 32, bottomY, centerX + bottleWidth / 2 - 16, bottomY - 24);
-    glass.lineTo(centerX + bottleWidth / 2, topY + 40);
-    glass.quadraticCurveTo(centerX + bottleWidth / 2, topY - 40, centerX + neckWidth / 2 - 24, topY);
-    glass.quadraticCurveTo(centerX + neckWidth / 2, topY + 10, centerX + neckWidth / 2, topY + 40);
-    glass.closePath();
-    glass.fillPath();
-    glass.strokePath();
+
+    const bottlePath = new Phaser.Curves.Path(centerX - neckWidth / 2, topY + 40);
+    bottlePath.quadraticBezierTo(centerX - neckWidth / 2, topY + 10, centerX - neckWidth / 2 + 24, topY);
+    bottlePath.quadraticBezierTo(centerX - bottleWidth / 2, topY - 40, centerX - bottleWidth / 2, topY + 40);
+    bottlePath.lineTo(centerX - bottleWidth / 2 + 16, bottomY - 24);
+    bottlePath.quadraticBezierTo(centerX - bottleWidth / 2 + 32, bottomY, centerX - bottleWidth / 2 + 48, bottomY);
+    bottlePath.lineTo(centerX + bottleWidth / 2 - 48, bottomY);
+    bottlePath.quadraticBezierTo(centerX + bottleWidth / 2 - 32, bottomY, centerX + bottleWidth / 2 - 16, bottomY - 24);
+    bottlePath.lineTo(centerX + bottleWidth / 2, topY + 40);
+    bottlePath.quadraticBezierTo(centerX + bottleWidth / 2, topY - 40, centerX + neckWidth / 2 - 24, topY);
+    bottlePath.quadraticBezierTo(centerX + neckWidth / 2, topY + 10, centerX + neckWidth / 2, topY + 40);
+    bottlePath.closePath();
+
+    const bottlePoints = bottlePath.getPoints(64);
+    glass.fillPoints(bottlePoints, true);
+    glass.strokePoints(bottlePoints, true);
 
     this.bottleGlow = this.add.rectangle(centerX, topY + bottleHeight / 2, bottleWidth - wallThickness, bottleHeight - wallThickness, 0x80b3ff, 0.12);
     this.bottleGlow.setVisible(false);
