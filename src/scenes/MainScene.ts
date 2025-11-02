@@ -2,8 +2,6 @@ import Phaser from 'phaser';
 import { CoinFactory } from '@/services/CoinFactory';
 import { gameState } from '@/services/GameStateManager';
 
-const BOTTLE_COLOR = 0xffffff;
-const BOTTLE_STROKE = 0x6b7a99;
 const BACKGROUND_COLOR = 0xe9f1f9;
 
 export class MainScene extends Phaser.Scene {
@@ -11,6 +9,10 @@ export class MainScene extends Phaser.Scene {
   private pendingQueue = 0;
   private dropping = false;
   private bottleGlow?: Phaser.GameObjects.Rectangle;
+  private bottleCanvas?: HTMLCanvasElement;
+  private bottleContext: CanvasRenderingContext2D | null = null;
+  private bottleBodies: MatterJS.BodyType[] = [];
+  private bottleInteriorRect = new Phaser.Geom.Rectangle();
   private jarReadyResolvers: Array<() => void> = [];
   private queuePromise: Promise<void> = Promise.resolve();
   private jarReady = true;
@@ -25,7 +27,8 @@ export class MainScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(BACKGROUND_COLOR);
-    this.matter.world.setBounds(0, 0, this.scale.width, this.scale.height, 64, true, true, false, true);
+    const boundaryThickness = Math.max(this.scale.width, this.scale.height) * 0.01;
+    this.matter.world.setBounds(0, 0, this.scale.width, this.scale.height, boundaryThickness, true, true, false, true);
     this.createBottle();
     this.coinFactory = new CoinFactory(this);
 
@@ -71,79 +74,293 @@ export class MainScene extends Phaser.Scene {
   }
 
   private createBottle(): void {
-    const { width, height } = this.scale;
-    const bottleWidth = 280;
-    const bottleHeight = height * 0.65;
-    const neckWidth = 140;
-    const wallThickness = 20;
-    const centerX = width / 2;
-    const bottomY = height - 40;
+    this.setupBottleCanvas();
+    this.redrawBottle();
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupBottle, this);
+  }
+
+  private setupBottleCanvas(): void {
+    if (this.bottleCanvas) {
+      return;
+    }
+
+    const container = document.getElementById('game-container');
+    if (!container) {
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'bottle-canvas';
+    canvas.style.position = 'absolute';
+    canvas.style.left = '0';
+    canvas.style.top = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '2';
+
+    const gameCanvas = this.game.canvas as HTMLCanvasElement | undefined;
+    if (gameCanvas) {
+      gameCanvas.style.position = 'relative';
+      gameCanvas.style.zIndex = '1';
+    }
+
+    container.insertBefore(canvas, container.firstChild);
+    this.bottleCanvas = canvas;
+    this.bottleContext = canvas.getContext('2d');
+  }
+
+  private redrawBottle(width = this.scale.width, height = this.scale.height): void {
+    if (!this.bottleCanvas || !this.bottleContext) {
+      return;
+    }
+
+    this.bottleCanvas.width = width;
+    this.bottleCanvas.height = height;
+
+    const ctx = this.bottleContext;
+    ctx.clearRect(0, 0, width, height);
+
+    const centerX = width * 0.5;
+    const bottomY = height * 0.9;
+    const bottleHeight = height * 0.72;
     const topY = bottomY - bottleHeight;
 
-    const glass = this.add.graphics();
-    glass.lineStyle(8, BOTTLE_STROKE, 0.8);
-    glass.fillStyle(BOTTLE_COLOR, 0.15);
+    const mouthHeight = bottleHeight * 0.06;
+    const neckHeight = bottleHeight * 0.17;
+    const shoulderHeight = bottleHeight * 0.14;
+    const baseCurveDepth = bottleHeight * 0.08;
 
-    const bottlePath = new Phaser.Curves.Path(centerX - neckWidth / 2, topY + 40);
-    bottlePath.quadraticBezierTo(centerX - neckWidth / 2, topY + 10, centerX - neckWidth / 2 + 24, topY);
-    bottlePath.quadraticBezierTo(centerX - bottleWidth / 2, topY - 40, centerX - bottleWidth / 2, topY + 40);
-    bottlePath.lineTo(centerX - bottleWidth / 2 + 16, bottomY - 24);
-    bottlePath.quadraticBezierTo(centerX - bottleWidth / 2 + 32, bottomY, centerX - bottleWidth / 2 + 48, bottomY);
-    bottlePath.lineTo(centerX + bottleWidth / 2 - 48, bottomY);
-    bottlePath.quadraticBezierTo(centerX + bottleWidth / 2 - 32, bottomY, centerX + bottleWidth / 2 - 16, bottomY - 24);
-    bottlePath.lineTo(centerX + bottleWidth / 2, topY + 40);
-    bottlePath.quadraticBezierTo(centerX + bottleWidth / 2, topY - 40, centerX + neckWidth / 2 - 24, topY);
-    bottlePath.quadraticBezierTo(centerX + neckWidth / 2, topY + 10, centerX + neckWidth / 2, topY + 40);
-    bottlePath.closePath();
+    const bodyWidth = width * 0.32;
+    const shoulderWidth = bodyWidth * 0.82;
+    const neckWidth = bodyWidth * 0.46;
+    const mouthWidth = neckWidth * 1.12;
+    const wallThickness = bodyWidth * 0.06;
+    const baseInset = bodyWidth * 0.22;
 
-    const bottlePoints = bottlePath.getPoints(64);
-    glass.fillPoints(bottlePoints, true);
-    glass.strokePoints(bottlePoints, true);
+    const mouthTopY = topY;
+    const mouthBottomY = mouthTopY + mouthHeight;
+    const neckBottomY = mouthBottomY + neckHeight;
+    const shoulderBottomY = neckBottomY + shoulderHeight;
+    const bodyBottomY = bottomY - baseCurveDepth;
 
-    this.bottleGlow = this.add.rectangle(centerX, topY + bottleHeight / 2, bottleWidth - wallThickness, bottleHeight - wallThickness, 0x80b3ff, 0.12);
-    this.bottleGlow.setVisible(false);
+    const leftNeckX = centerX - neckWidth * 0.5;
+    const rightNeckX = centerX + neckWidth * 0.5;
+    const leftShoulderX = centerX - shoulderWidth * 0.5;
+    const rightShoulderX = centerX + shoulderWidth * 0.5;
+    const leftBodyX = centerX - bodyWidth * 0.5;
+    const rightBodyX = centerX + bodyWidth * 0.5;
+    const mouthHalfWidth = mouthWidth * 0.5;
+    const mouthRadius = mouthHeight * 0.45;
 
-    const leftWall = this.matter.add.rectangle(
-      centerX - bottleWidth / 2 + wallThickness / 2,
-      bottomY - bottleHeight / 2,
-      wallThickness,
-      bottleHeight,
-      { isStatic: true, angle: Phaser.Math.DegToRad(-6) }
+    const bodyCurveMid = shoulderBottomY + (bodyBottomY - shoulderBottomY) * 0.6;
+
+    ctx.lineWidth = Math.max(width, height) * 0.006;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#6b7a99';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+
+    ctx.beginPath();
+    ctx.moveTo(leftNeckX, mouthBottomY);
+    ctx.lineTo(leftNeckX, neckBottomY);
+    ctx.bezierCurveTo(
+      leftNeckX,
+      neckBottomY + shoulderHeight * 0.4,
+      leftShoulderX,
+      neckBottomY + shoulderHeight * 0.6,
+      leftShoulderX,
+      shoulderBottomY
     );
-
-    const rightWall = this.matter.add.rectangle(
-      centerX + bottleWidth / 2 - wallThickness / 2,
-      bottomY - bottleHeight / 2,
-      wallThickness,
-      bottleHeight,
-      { isStatic: true, angle: Phaser.Math.DegToRad(6) }
+    ctx.bezierCurveTo(
+      leftShoulderX,
+      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.3,
+      leftBodyX,
+      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.9,
+      leftBodyX,
+      bodyBottomY
     );
+    ctx.bezierCurveTo(
+      leftBodyX,
+      bottomY - baseCurveDepth * 0.4,
+      centerX - baseInset,
+      bottomY,
+      centerX,
+      bottomY
+    );
+    ctx.bezierCurveTo(
+      centerX + baseInset,
+      bottomY,
+      rightBodyX,
+      bottomY - baseCurveDepth * 0.4,
+      rightBodyX,
+      bodyBottomY
+    );
+    ctx.bezierCurveTo(
+      rightBodyX,
+      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.9,
+      rightShoulderX,
+      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.3,
+      rightShoulderX,
+      shoulderBottomY
+    );
+    ctx.bezierCurveTo(
+      rightShoulderX,
+      neckBottomY + shoulderHeight * 0.6,
+      rightNeckX,
+      neckBottomY + shoulderHeight * 0.4,
+      rightNeckX,
+      neckBottomY
+    );
+    ctx.lineTo(rightNeckX, mouthBottomY);
+    ctx.lineTo(centerX + mouthHalfWidth - mouthRadius, mouthBottomY);
+    ctx.quadraticCurveTo(
+      centerX + mouthHalfWidth,
+      mouthBottomY,
+      centerX + mouthHalfWidth,
+      mouthBottomY - mouthRadius
+    );
+    ctx.lineTo(centerX + mouthHalfWidth, mouthTopY + mouthRadius);
+    ctx.quadraticCurveTo(
+      centerX + mouthHalfWidth,
+      mouthTopY,
+      centerX + mouthHalfWidth - mouthRadius,
+      mouthTopY
+    );
+    ctx.lineTo(centerX - mouthHalfWidth + mouthRadius, mouthTopY);
+    ctx.quadraticCurveTo(
+      centerX - mouthHalfWidth,
+      mouthTopY,
+      centerX - mouthHalfWidth,
+      mouthTopY + mouthRadius
+    );
+    ctx.lineTo(centerX - mouthHalfWidth, mouthBottomY - mouthRadius);
+    ctx.quadraticCurveTo(
+      centerX - mouthHalfWidth,
+      mouthBottomY,
+      centerX - mouthHalfWidth + mouthRadius,
+      mouthBottomY
+    );
+    ctx.lineTo(leftNeckX, mouthBottomY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const interiorTop = shoulderBottomY + (bodyBottomY - shoulderBottomY) * 0.08;
+    const interiorBottom = bottomY - wallThickness * 1.2;
+    const interiorWidth = bodyWidth - wallThickness * 2;
+    const interiorHeight = Math.max(interiorBottom - interiorTop, 0);
+    const interiorX = centerX - interiorWidth * 0.5;
+    const interiorY = interiorTop;
+
+    this.bottleInteriorRect.setTo(interiorX, interiorY, interiorWidth, interiorHeight);
+
+    const glowCenterX = interiorX + interiorWidth * 0.5;
+    const glowCenterY = interiorY + interiorHeight * 0.5;
+
+    if (this.bottleGlow) {
+      this.bottleGlow.setPosition(glowCenterX, glowCenterY);
+      this.bottleGlow.width = interiorWidth;
+      this.bottleGlow.height = interiorHeight;
+      this.bottleGlow.displayWidth = interiorWidth;
+      this.bottleGlow.displayHeight = interiorHeight;
+    } else {
+      this.bottleGlow = this.add.rectangle(glowCenterX, glowCenterY, interiorWidth, interiorHeight, 0x80b3ff, 0.12);
+      this.bottleGlow.setVisible(false);
+      this.bottleGlow.setDepth(-1);
+    }
+
+    const geometry = {
+      centerX,
+      bottomY,
+      mouthBottomY,
+      neckBottomY,
+      neckWidth,
+      bodyWidth,
+      wallThickness,
+      interiorHeight,
+      interiorTop
+    };
+
+    this.rebuildBottlePhysics(geometry);
+    const boundary = Math.max(width, height) * 0.01;
+    this.matter.world.setBounds(0, 0, width, height, boundary, true, true, false, true);
+  }
+
+  private rebuildBottlePhysics(geometry: {
+    centerX: number;
+    bottomY: number;
+    mouthBottomY: number;
+    neckBottomY: number;
+    neckWidth: number;
+    bodyWidth: number;
+    wallThickness: number;
+    interiorHeight: number;
+    interiorTop: number;
+  }): void {
+    this.bottleBodies.forEach((body) => this.matter.world.remove(body));
+    this.bottleBodies = [];
+
+    const { centerX, bottomY, mouthBottomY, neckBottomY, neckWidth, bodyWidth, wallThickness, interiorHeight, interiorTop } = geometry;
+
+    const leftWallX = centerX - bodyWidth * 0.5 + wallThickness * 0.5;
+    const rightWallX = centerX + bodyWidth * 0.5 - wallThickness * 0.5;
+    const wallCenterY = interiorTop + interiorHeight * 0.5;
+    const wallHeight = interiorHeight + wallThickness;
+
+    const leftWall = this.matter.add.rectangle(leftWallX, wallCenterY, wallThickness, wallHeight, { isStatic: true });
+    const rightWall = this.matter.add.rectangle(rightWallX, wallCenterY, wallThickness, wallHeight, { isStatic: true });
+
+    const neckSegmentHeight = (neckBottomY - mouthBottomY) * 0.6;
+    const neckSegmentY = mouthBottomY + neckSegmentHeight * 0.5;
 
     const neckLeft = this.matter.add.rectangle(
-      centerX - neckWidth / 2,
-      topY + 70,
+      centerX - neckWidth * 0.5,
+      neckSegmentY,
       wallThickness,
-      140,
+      neckSegmentHeight,
       { isStatic: true }
     );
 
     const neckRight = this.matter.add.rectangle(
-      centerX + neckWidth / 2,
-      topY + 70,
+      centerX + neckWidth * 0.5,
+      neckSegmentY,
       wallThickness,
-      140,
+      neckSegmentHeight,
       { isStatic: true }
     );
 
-    this.matter.add.rectangle(centerX, bottomY, bottleWidth - wallThickness, wallThickness, {
-      isStatic: true,
-      chamfer: { radius: 12 }
-    });
+    const base = this.matter.add.rectangle(
+      centerX,
+      bottomY - wallThickness * 0.5,
+      bodyWidth - wallThickness,
+      wallThickness,
+      { isStatic: true }
+    );
 
-    [leftWall, rightWall, neckLeft, neckRight].forEach((body) => {
+    const bodies = [leftWall, rightWall, neckLeft, neckRight, base];
+    bodies.forEach((body) => {
       body.restitution = 0.12;
       body.friction = 0.01;
     });
+
+    this.bottleBodies = bodies;
+  }
+
+  private onResize(gameSize: Phaser.Structs.Size): void {
+    this.redrawBottle(gameSize.width, gameSize.height);
+  }
+
+  private cleanupBottle(): void {
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
+    this.bottleBodies.forEach((body) => this.matter.world.remove(body));
+    this.bottleBodies = [];
+    this.bottleGlow?.destroy();
+    this.bottleGlow = undefined;
+    this.bottleCanvas?.remove();
+    this.bottleCanvas = undefined;
+    this.bottleContext = null;
   }
 
   private flashBottle(): void {
