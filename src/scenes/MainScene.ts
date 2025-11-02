@@ -155,8 +155,6 @@ export class MainScene extends Phaser.Scene {
 
     const ctx = this.bottleContext;
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = BACKGROUND_COLOR;
-    ctx.fillRect(0, 0, width, height);
 
     const imageReady = this.ensureBottleImage();
 
