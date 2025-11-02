@@ -66,7 +66,15 @@ const bootstrapScene = (): void => {
   if (status >= Phaser.Scenes.RUNNING) {
     setupHomeUI();
   } else {
-    mainScene.events.once(Phaser.Scenes.Events.CREATE, setupHomeUI);
+    const eventEmitter = mainScene.sys?.events ?? mainScene.events;
+
+    if (!eventEmitter) {
+      debugLogger.log('Scene events not ready. Retrying...');
+      window.requestAnimationFrame(bootstrapScene);
+      return;
+    }
+
+    eventEmitter.once(Phaser.Scenes.Events.CREATE, setupHomeUI);
   }
 };
 
