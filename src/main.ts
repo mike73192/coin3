@@ -21,7 +21,7 @@ const gameConfig: Phaser.Types.Core.GameConfig = {
   parent: 'game-container',
   width: size.width,
   height: size.height,
-  backgroundColor: '#e9f1f9',
+  transparent: true,
   physics: {
     default: 'matter',
     matter: {
