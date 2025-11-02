@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CoinFactory } from '@/services/CoinFactory';
 import { gameState } from '@/services/GameStateManager';
+import bottleImageUrl from '../../art/fb32b0195c07167f33583a0225f2b927-1.png';
 
 const BACKGROUND_COLOR = 0xe9f1f9;
 
@@ -11,6 +12,8 @@ export class MainScene extends Phaser.Scene {
   private bottleGlow?: Phaser.GameObjects.Rectangle;
   private bottleCanvas?: HTMLCanvasElement;
   private bottleContext: CanvasRenderingContext2D | null = null;
+  private bottleImage?: HTMLImageElement;
+  private bottleImageLoaded = false;
   private bottleBodies: MatterJS.BodyType[] = [];
   private bottleInteriorRect = new Phaser.Geom.Rectangle();
   private jarReadyResolvers: Array<() => void> = [];
@@ -75,6 +78,7 @@ export class MainScene extends Phaser.Scene {
 
   private createBottle(): void {
     this.setupBottleCanvas();
+    this.ensureBottleImage();
     this.redrawBottle();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupBottle, this);
@@ -111,6 +115,36 @@ export class MainScene extends Phaser.Scene {
     this.bottleContext = canvas.getContext('2d');
   }
 
+  private ensureBottleImage(): boolean {
+    if (this.bottleImageLoaded) {
+      return true;
+    }
+
+    if (!this.bottleImage) {
+      const image = new Image();
+      image.src = bottleImageUrl;
+      image.onload = () => {
+        this.bottleImageLoaded = true;
+        this.redrawBottle();
+      };
+      this.bottleImage = image;
+
+      if (image.complete) {
+        this.bottleImageLoaded = true;
+        return true;
+      }
+
+      return false;
+    }
+
+    if (this.bottleImage.complete) {
+      this.bottleImageLoaded = true;
+      return true;
+    }
+
+    return false;
+  }
+
   private redrawBottle(width = this.scale.width, height = this.scale.height): void {
     if (!this.bottleCanvas || !this.bottleContext) {
       return;
@@ -122,6 +156,8 @@ export class MainScene extends Phaser.Scene {
     const ctx = this.bottleContext;
     ctx.clearRect(0, 0, width, height);
 
+    const imageReady = this.ensureBottleImage();
+
     const centerX = width * 0.5;
     const bottomY = height * 0.9;
     const bottleHeight = height * 0.72;
@@ -132,12 +168,19 @@ export class MainScene extends Phaser.Scene {
     const shoulderHeight = bottleHeight * 0.14;
     const baseCurveDepth = bottleHeight * 0.08;
 
-    const bodyWidth = width * 0.32;
-    const shoulderWidth = bodyWidth * 0.82;
+    const defaultBodyWidth = width * 0.32;
+    let bodyWidth = defaultBodyWidth;
+    let drawWidth = defaultBodyWidth;
+
+    const imageAspect = this.bottleImage && this.bottleImage.height > 0 ? this.bottleImage.width / this.bottleImage.height : 0;
+
+    if (imageReady && this.bottleImage && imageAspect > 0) {
+      drawWidth = bottleHeight * imageAspect;
+      bodyWidth = drawWidth;
+    }
+
     const neckWidth = bodyWidth * 0.46;
-    const mouthWidth = neckWidth * 1.12;
     const wallThickness = bodyWidth * 0.06;
-    const baseInset = bodyWidth * 0.22;
 
     const mouthTopY = topY;
     const mouthBottomY = mouthTopY + mouthHeight;
@@ -145,107 +188,9 @@ export class MainScene extends Phaser.Scene {
     const shoulderBottomY = neckBottomY + shoulderHeight;
     const bodyBottomY = bottomY - baseCurveDepth;
 
-    const leftNeckX = centerX - neckWidth * 0.5;
-    const rightNeckX = centerX + neckWidth * 0.5;
-    const leftShoulderX = centerX - shoulderWidth * 0.5;
-    const rightShoulderX = centerX + shoulderWidth * 0.5;
-    const leftBodyX = centerX - bodyWidth * 0.5;
-    const rightBodyX = centerX + bodyWidth * 0.5;
-    const mouthHalfWidth = mouthWidth * 0.5;
-    const mouthRadius = mouthHeight * 0.45;
-
-    const bodyCurveMid = shoulderBottomY + (bodyBottomY - shoulderBottomY) * 0.6;
-
-    ctx.lineWidth = Math.max(width, height) * 0.006;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#6b7a99';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
-
-    ctx.beginPath();
-    ctx.moveTo(leftNeckX, mouthBottomY);
-    ctx.lineTo(leftNeckX, neckBottomY);
-    ctx.bezierCurveTo(
-      leftNeckX,
-      neckBottomY + shoulderHeight * 0.4,
-      leftShoulderX,
-      neckBottomY + shoulderHeight * 0.6,
-      leftShoulderX,
-      shoulderBottomY
-    );
-    ctx.bezierCurveTo(
-      leftShoulderX,
-      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.3,
-      leftBodyX,
-      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.9,
-      leftBodyX,
-      bodyBottomY
-    );
-    ctx.bezierCurveTo(
-      leftBodyX,
-      bottomY - baseCurveDepth * 0.4,
-      centerX - baseInset,
-      bottomY,
-      centerX,
-      bottomY
-    );
-    ctx.bezierCurveTo(
-      centerX + baseInset,
-      bottomY,
-      rightBodyX,
-      bottomY - baseCurveDepth * 0.4,
-      rightBodyX,
-      bodyBottomY
-    );
-    ctx.bezierCurveTo(
-      rightBodyX,
-      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.9,
-      rightShoulderX,
-      shoulderBottomY + (bodyCurveMid - shoulderBottomY) * 0.3,
-      rightShoulderX,
-      shoulderBottomY
-    );
-    ctx.bezierCurveTo(
-      rightShoulderX,
-      neckBottomY + shoulderHeight * 0.6,
-      rightNeckX,
-      neckBottomY + shoulderHeight * 0.4,
-      rightNeckX,
-      neckBottomY
-    );
-    ctx.lineTo(rightNeckX, mouthBottomY);
-    ctx.lineTo(centerX + mouthHalfWidth - mouthRadius, mouthBottomY);
-    ctx.quadraticCurveTo(
-      centerX + mouthHalfWidth,
-      mouthBottomY,
-      centerX + mouthHalfWidth,
-      mouthBottomY - mouthRadius
-    );
-    ctx.lineTo(centerX + mouthHalfWidth, mouthTopY + mouthRadius);
-    ctx.quadraticCurveTo(
-      centerX + mouthHalfWidth,
-      mouthTopY,
-      centerX + mouthHalfWidth - mouthRadius,
-      mouthTopY
-    );
-    ctx.lineTo(centerX - mouthHalfWidth + mouthRadius, mouthTopY);
-    ctx.quadraticCurveTo(
-      centerX - mouthHalfWidth,
-      mouthTopY,
-      centerX - mouthHalfWidth,
-      mouthTopY + mouthRadius
-    );
-    ctx.lineTo(centerX - mouthHalfWidth, mouthBottomY - mouthRadius);
-    ctx.quadraticCurveTo(
-      centerX - mouthHalfWidth,
-      mouthBottomY,
-      centerX - mouthHalfWidth + mouthRadius,
-      mouthBottomY
-    );
-    ctx.lineTo(leftNeckX, mouthBottomY);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    if (imageReady && this.bottleImage && imageAspect > 0) {
+      ctx.drawImage(this.bottleImage, centerX - drawWidth * 0.5, topY, drawWidth, bottleHeight);
+    }
 
     const interiorTop = shoulderBottomY + (bodyBottomY - shoulderBottomY) * 0.08;
     const interiorBottom = bottomY - wallThickness * 1.2;
