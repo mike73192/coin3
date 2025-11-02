@@ -172,7 +172,14 @@ export class MainScene extends Phaser.Scene {
     let bodyWidth = defaultBodyWidth;
     let drawWidth = defaultBodyWidth;
 
-    const imageAspect = this.bottleImage && this.bottleImage.height > 0 ? this.bottleImage.width / this.bottleImage.height : 0;
+    let imageAspect = 0;
+    if (this.bottleImage) {
+      const sourceWidth = this.bottleImage.naturalWidth || this.bottleImage.width;
+      const sourceHeight = this.bottleImage.naturalHeight || this.bottleImage.height;
+      if (sourceWidth > 0 && sourceHeight > 0) {
+        imageAspect = sourceWidth / sourceHeight;
+      }
+    }
 
     if (imageReady && this.bottleImage && imageAspect > 0) {
       drawWidth = bottleHeight * imageAspect;
