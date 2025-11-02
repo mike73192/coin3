@@ -3,7 +3,7 @@ import { CoinFactory } from '@/services/CoinFactory';
 import { gameState } from '@/services/GameStateManager';
 import bottleImageUrl from '../../art/fb32b0195c07167f33583a0225f2b927-1.png';
 
-const BACKGROUND_COLOR = 0xe9f1f9;
+const BACKGROUND_COLOR = '#e9f1f9';
 
 export class MainScene extends Phaser.Scene {
   private coinFactory!: CoinFactory;
@@ -29,7 +29,6 @@ export class MainScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor(BACKGROUND_COLOR);
     const boundaryThickness = Math.max(this.scale.width, this.scale.height) * 0.01;
     this.matter.world.setBounds(0, 0, this.scale.width, this.scale.height, boundaryThickness, true, true, false, true);
     this.createBottle();
@@ -102,12 +101,13 @@ export class MainScene extends Phaser.Scene {
     canvas.style.width = '100%';
     canvas.style.height = '100%';
     canvas.style.pointerEvents = 'none';
-    canvas.style.zIndex = '0';
+    canvas.style.setProperty('z-index', '2', 'important');
 
     const gameCanvas = this.game.canvas as HTMLCanvasElement | undefined;
     if (gameCanvas) {
       gameCanvas.style.position = 'relative';
-      gameCanvas.style.zIndex = '1';
+      gameCanvas.style.setProperty('z-index', '1', 'important');
+      gameCanvas.style.backgroundColor = 'transparent';
     }
 
     container.insertBefore(canvas, container.firstChild);
