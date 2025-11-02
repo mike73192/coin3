@@ -5,6 +5,38 @@ import bottleImageUrl from '../../art/fb32b0195c07167f33583a0225f2b927-1.png';
 
 const BACKGROUND_COLOR = '#e9f1f9';
 
+const BOTTLE_IMAGE_WIDTH = 1000;
+const BOTTLE_IMAGE_HEIGHT = 1000;
+const BOTTLE_BOUND_LEFT = 285;
+const BOTTLE_BOUND_RIGHT = 755;
+const BOTTLE_BOUND_TOP = 106;
+const BOTTLE_BOUND_BOTTOM = 960;
+const BOTTLE_NECK_BOTTOM = 114;
+const BOTTLE_BODY_START = 400;
+const BOTTLE_BASE_START = 920;
+const BOTTLE_BASE_BOTTOM = 960;
+const BOTTLE_CENTER_OFFSET_RATIO = ((BOTTLE_BOUND_LEFT + BOTTLE_BOUND_RIGHT) * 0.5 - BOTTLE_IMAGE_WIDTH * 0.5) / BOTTLE_IMAGE_WIDTH;
+const BOTTLE_WIDTH_RATIO = (BOTTLE_BOUND_RIGHT - BOTTLE_BOUND_LEFT) / BOTTLE_IMAGE_WIDTH;
+const GLASS_THICKNESS_PX = 24;
+const MIN_INTERIOR_WIDTH_PX = 48;
+
+const BOTTLE_INTERIOR_PROFILE = [
+  { imageY: 114, width: 207 },
+  { imageY: 160, width: 329 },
+  { imageY: 210, width: 305 },
+  { imageY: 260, width: 298 },
+  { imageY: 320, width: 330 },
+  { imageY: 348, width: 401 },
+  { imageY: 400, width: 461 },
+  { imageY: 500, width: 465 },
+  { imageY: 600, width: 457 },
+  { imageY: 700, width: 451 },
+  { imageY: 800, width: 441 },
+  { imageY: 880, width: 432 },
+  { imageY: 920, width: 386 },
+  { imageY: 960, width: 86 }
+];
+
 export class MainScene extends Phaser.Scene {
   private coinFactory!: CoinFactory;
   private pendingQueue = 0;
@@ -163,13 +195,7 @@ export class MainScene extends Phaser.Scene {
     const bottleHeight = height * 0.72;
     const topY = bottomY - bottleHeight;
 
-    const mouthHeight = bottleHeight * 0.06;
-    const neckHeight = bottleHeight * 0.17;
-    const shoulderHeight = bottleHeight * 0.14;
-    const baseCurveDepth = bottleHeight * 0.08;
-
     const defaultBodyWidth = width * 0.32;
-    let bodyWidth = defaultBodyWidth;
     let drawWidth = defaultBodyWidth;
 
     let imageAspect = 0;
@@ -183,32 +209,53 @@ export class MainScene extends Phaser.Scene {
 
     if (imageReady && this.bottleImage && imageAspect > 0) {
       drawWidth = bottleHeight * imageAspect;
-      bodyWidth = drawWidth;
     }
-
-    const neckWidth = bodyWidth * 0.46;
-    const wallThickness = bodyWidth * 0.06;
-
-    const mouthTopY = topY;
-    const mouthBottomY = mouthTopY + mouthHeight;
-    const neckBottomY = mouthBottomY + neckHeight;
-    const shoulderBottomY = neckBottomY + shoulderHeight;
-    const bodyBottomY = bottomY - baseCurveDepth;
 
     if (imageReady && this.bottleImage && imageAspect > 0) {
       ctx.drawImage(this.bottleImage, centerX - drawWidth * 0.5, topY, drawWidth, bottleHeight);
     }
 
-    const interiorTop = shoulderBottomY + (bodyBottomY - shoulderBottomY) * 0.08;
-    const interiorBottom = bottomY - wallThickness * 1.2;
-    const interiorWidth = bodyWidth - wallThickness * 2;
+    const jarCenterX = centerX + drawWidth * BOTTLE_CENTER_OFFSET_RATIO;
+    const jarWidth = drawWidth * BOTTLE_WIDTH_RATIO;
+    const jarToWorldY = (imageY: number) => topY + bottleHeight * (imageY / BOTTLE_IMAGE_HEIGHT);
+    const jarTopY = jarToWorldY(BOTTLE_BOUND_TOP);
+    const jarBottomY = jarToWorldY(BOTTLE_BOUND_BOTTOM);
+    const jarBodyTopY = jarToWorldY(BOTTLE_BODY_START);
+    const jarBaseStartY = jarToWorldY(BOTTLE_BASE_START);
+    const jarBaseBottomY = jarToWorldY(BOTTLE_BASE_BOTTOM);
+    const jarNeckBottomY = jarToWorldY(BOTTLE_NECK_BOTTOM);
+    const wallThickness = Math.max(jarWidth * 0.025, 10);
+    const boundsWidth = BOTTLE_BOUND_RIGHT - BOTTLE_BOUND_LEFT;
+
+    const convertInteriorHalfWidth = (pixelWidth: number) => {
+      const adjustedPx = Math.max(pixelWidth - GLASS_THICKNESS_PX * 2, MIN_INTERIOR_WIDTH_PX);
+      const scaledWidth = jarWidth * (adjustedPx / boundsWidth);
+      return Math.max(scaledWidth * 0.5, wallThickness * 0.65);
+    };
+
+    const leftPoints = BOTTLE_INTERIOR_PROFILE.map((point) => {
+      const y = jarToWorldY(point.imageY);
+      const halfWidth = convertInteriorHalfWidth(point.width);
+      return { x: jarCenterX - halfWidth, y };
+    });
+
+    const rightPoints = BOTTLE_INTERIOR_PROFILE.map((point) => {
+      const y = jarToWorldY(point.imageY);
+      const halfWidth = convertInteriorHalfWidth(point.width);
+      return { x: jarCenterX + halfWidth, y };
+    });
+
+    const bodyProfile = BOTTLE_INTERIOR_PROFILE.find((point) => point.imageY === 500) ?? BOTTLE_INTERIOR_PROFILE[6];
+    const interiorWidth = convertInteriorHalfWidth(bodyProfile.width) * 2;
+    const interiorTop = jarBodyTopY + (jarBaseStartY - jarBodyTopY) * 0.05;
+    const interiorBottom = jarBaseStartY - Math.max(wallThickness * 1.5, 0);
     const interiorHeight = Math.max(interiorBottom - interiorTop, 0);
-    const interiorX = centerX - interiorWidth * 0.5;
+    const interiorX = jarCenterX - interiorWidth * 0.5;
     const interiorY = interiorTop;
 
     this.bottleInteriorRect.setTo(interiorX, interiorY, interiorWidth, interiorHeight);
 
-    const glowCenterX = interiorX + interiorWidth * 0.5;
+    const glowCenterX = jarCenterX;
     const glowCenterY = interiorY + interiorHeight * 0.5;
 
     if (this.bottleGlow) {
@@ -223,16 +270,20 @@ export class MainScene extends Phaser.Scene {
       this.bottleGlow.setDepth(-1);
     }
 
+    const baseTopLeft = leftPoints[leftPoints.length - 2] ?? leftPoints[leftPoints.length - 1];
+    const baseTopRight = rightPoints[rightPoints.length - 2] ?? rightPoints[rightPoints.length - 1];
+
     const geometry = {
-      centerX,
-      bottomY,
-      mouthBottomY,
-      neckBottomY,
-      neckWidth,
-      bodyWidth,
       wallThickness,
-      interiorHeight,
-      interiorTop
+      leftPoints,
+      rightPoints,
+      baseFloor: {
+        x1: baseTopLeft.x,
+        y1: baseTopLeft.y,
+        x2: baseTopRight.x,
+        y2: baseTopRight.y
+      },
+      neckTopY: jarToWorldY(Math.max(BOTTLE_NECK_BOTTOM - 10, BOTTLE_BOUND_TOP))
     };
 
     this.rebuildBottlePhysics(geometry);
@@ -241,63 +292,63 @@ export class MainScene extends Phaser.Scene {
   }
 
   private rebuildBottlePhysics(geometry: {
-    centerX: number;
-    bottomY: number;
-    mouthBottomY: number;
-    neckBottomY: number;
-    neckWidth: number;
-    bodyWidth: number;
     wallThickness: number;
-    interiorHeight: number;
-    interiorTop: number;
+    leftPoints: Array<{ x: number; y: number }>;
+    rightPoints: Array<{ x: number; y: number }>;
+    baseFloor: { x1: number; y1: number; x2: number; y2: number };
+    neckTopY: number;
   }): void {
     this.bottleBodies.forEach((body) => this.matter.world.remove(body));
     this.bottleBodies = [];
 
-    const { centerX, bottomY, mouthBottomY, neckBottomY, neckWidth, bodyWidth, wallThickness, interiorHeight, interiorTop } = geometry;
+    const { wallThickness, leftPoints, rightPoints, baseFloor, neckTopY } = geometry;
 
-    const leftWallX = centerX - bodyWidth * 0.5 + wallThickness * 0.5;
-    const rightWallX = centerX + bodyWidth * 0.5 - wallThickness * 0.5;
-    const wallCenterY = interiorTop + interiorHeight * 0.5;
-    const wallHeight = interiorHeight + wallThickness;
+    if (!leftPoints.length || !rightPoints.length) {
+      return;
+    }
 
-    const leftWall = this.matter.add.rectangle(leftWallX, wallCenterY, wallThickness, wallHeight, { isStatic: true });
-    const rightWall = this.matter.add.rectangle(rightWallX, wallCenterY, wallThickness, wallHeight, { isStatic: true });
+    const startY = Math.min(neckTopY, leftPoints[0].y - 2);
+    const leftChain = [{ x: leftPoints[0].x, y: startY }, ...leftPoints];
+    const rightChain = [{ x: rightPoints[0].x, y: startY }, ...rightPoints];
 
-    const neckSegmentHeight = (neckBottomY - mouthBottomY) * 0.6;
-    const neckSegmentY = mouthBottomY + neckSegmentHeight * 0.5;
+    const addSegment = (x1: number, y1: number, x2: number, y2: number) => {
+      if (!Number.isFinite(x1 + y1 + x2 + y2)) {
+        return;
+      }
 
-    const neckLeft = this.matter.add.rectangle(
-      centerX - neckWidth * 0.5,
-      neckSegmentY,
-      wallThickness,
-      neckSegmentHeight,
-      { isStatic: true }
-    );
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const length = Math.hypot(dx, dy);
+      if (length <= 1) {
+        return;
+      }
 
-    const neckRight = this.matter.add.rectangle(
-      centerX + neckWidth * 0.5,
-      neckSegmentY,
-      wallThickness,
-      neckSegmentHeight,
-      { isStatic: true }
-    );
-
-    const base = this.matter.add.rectangle(
-      centerX,
-      bottomY - wallThickness * 0.5,
-      bodyWidth - wallThickness,
-      wallThickness,
-      { isStatic: true }
-    );
-
-    const bodies = [leftWall, rightWall, neckLeft, neckRight, base];
-    bodies.forEach((body) => {
+      const midX = (x1 + x2) * 0.5;
+      const midY = (y1 + y2) * 0.5;
+      const angle = Math.atan2(dy, dx);
+      const body = this.matter.add.rectangle(midX, midY, length + wallThickness * 0.6, wallThickness, { isStatic: true });
+      this.matter.body.setAngle(body, angle);
       body.restitution = 0.12;
       body.friction = 0.01;
-    });
+      this.bottleBodies.push(body);
+    };
 
-    this.bottleBodies = bodies;
+    const appendSegments = (points: Array<{ x: number; y: number }>) => {
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const current = points[i];
+        const next = points[i + 1];
+        addSegment(current.x, current.y, next.x, next.y);
+      }
+    };
+
+    appendSegments(leftChain);
+    appendSegments(rightChain);
+
+    addSegment(baseFloor.x1, baseFloor.y1, baseFloor.x2, baseFloor.y2);
+
+    const bottomLeft = leftPoints[leftPoints.length - 1];
+    const bottomRight = rightPoints[rightPoints.length - 1];
+    addSegment(bottomLeft.x, bottomLeft.y, bottomRight.x, bottomRight.y);
   }
 
   private onResize(gameSize: Phaser.Structs.Size): void {
