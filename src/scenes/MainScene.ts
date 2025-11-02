@@ -168,7 +168,17 @@ export class MainScene extends Phaser.Scene {
     const shoulderHeight = bottleHeight * 0.14;
     const baseCurveDepth = bottleHeight * 0.08;
 
-    const bodyWidth = width * 0.32;
+    const defaultBodyWidth = width * 0.32;
+    let bodyWidth = defaultBodyWidth;
+    let drawWidth = defaultBodyWidth;
+
+    const imageAspect = this.bottleImage && this.bottleImage.height > 0 ? this.bottleImage.width / this.bottleImage.height : 0;
+
+    if (imageReady && this.bottleImage && imageAspect > 0) {
+      drawWidth = bottleHeight * imageAspect;
+      bodyWidth = drawWidth;
+    }
+
     const neckWidth = bodyWidth * 0.46;
     const wallThickness = bodyWidth * 0.06;
 
@@ -178,9 +188,7 @@ export class MainScene extends Phaser.Scene {
     const shoulderBottomY = neckBottomY + shoulderHeight;
     const bodyBottomY = bottomY - baseCurveDepth;
 
-    if (imageReady && this.bottleImage) {
-      const imageAspect = this.bottleImage.width / this.bottleImage.height || 1;
-      const drawWidth = bottleHeight * imageAspect;
+    if (imageReady && this.bottleImage && imageAspect > 0) {
       ctx.drawImage(this.bottleImage, centerX - drawWidth * 0.5, topY, drawWidth, bottleHeight);
     }
 
