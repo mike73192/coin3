@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CoinFactory } from '@/services/CoinFactory';
 import { gameState } from '@/services/GameStateManager';
+import { appConfig } from '@/services/AppConfig';
 import bottleImageUrl from '../../art/fb32b0195c07167f33583a0225f2b927-1.png';
 
 const BACKGROUND_COLOR = '#e9f1f9';
@@ -89,7 +90,7 @@ export class MainScene extends Phaser.Scene {
     if (this.dropping) return;
     this.dropping = true;
     while (this.pendingQueue > 0) {
-      const batch = Math.min(6, this.pendingQueue);
+      const batch = Math.min(appConfig.coins.dropBatchSize, this.pendingQueue);
       await this.coinFactory.spawnCoins(batch);
       this.pendingQueue -= batch;
     }

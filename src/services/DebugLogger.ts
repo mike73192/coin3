@@ -1,5 +1,7 @@
+import { appConfig } from '@/services/AppConfig';
+
 const STORAGE_KEY = 'coin3-debug-log';
-const MAX_LOG_ENTRIES = 500;
+const MAX_LOG_ENTRIES = appConfig.logging.maxEntries;
 
 function isLocalStorageAvailable(): boolean {
   try {
@@ -19,6 +21,7 @@ export class DebugLogger {
   private logs: string[] = [];
 
   private readonly storageEnabled = isLocalStorageAvailable();
+  private readonly consoleEnabled = appConfig.logging.consoleEnabled || import.meta.env.DEV;
 
   constructor() {
     this.logs = this.load();
@@ -90,7 +93,7 @@ export class DebugLogger {
   }
 
   private writeToConsole(message: string, data?: Record<string, unknown>): void {
-    if (import.meta.env.DEV) {
+    if (this.consoleEnabled) {
       if (data) {
         console.debug(`[DebugLogger] ${message}`, data);
       } else {

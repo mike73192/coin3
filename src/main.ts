@@ -3,13 +3,14 @@ import { MainScene } from '@/scenes/MainScene';
 import { HomeUI } from '@/ui/HomeUI';
 import { gameState } from '@/services/GameStateManager';
 import { debugLogger } from '@/services/DebugLogger';
+import { appConfig } from '@/services/AppConfig';
 
 const SCENE_KEY = 'MainScene';
 
 const computeSize = () => {
-  const panelWidth = 320;
-  const width = Math.max(640, window.innerWidth - panelWidth);
-  const height = Math.max(600, window.innerHeight);
+  const panelWidth = appConfig.graphics.panelWidth;
+  const width = Math.max(appConfig.graphics.minWidth, window.innerWidth - panelWidth);
+  const height = Math.max(appConfig.graphics.minHeight, window.innerHeight);
   return { width, height };
 };
 
@@ -25,8 +26,8 @@ const gameConfig: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'matter',
     matter: {
-      gravity: { x: 0, y: 1 },
-      debug: false
+      gravity: { x: appConfig.physics.gravityX, y: appConfig.physics.gravityY },
+      debug: appConfig.physics.matterDebug
     }
   },
   scene: [mainSceneInstance]
@@ -45,7 +46,7 @@ const setupHomeUI = (): void => {
   debugLogger.log('Initializing HomeUI instance.');
   new HomeUI({
     onRecord: (coins) => enqueueAddition(coins),
-    onKeyboardCoin: () => enqueueAddition(1)
+    onKeyboardCoin: (amount) => enqueueAddition(amount)
   });
   debugLogger.log('HomeUI ready.');
 };

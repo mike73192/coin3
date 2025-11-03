@@ -1,5 +1,6 @@
 import { gameState } from '@/services/GameStateManager';
 import { debugLogger } from '@/services/DebugLogger';
+import { appConfig } from '@/services/AppConfig';
 
 export interface RecordResult {
   title: string;
@@ -8,8 +9,8 @@ export interface RecordResult {
 
 type SliderElement = HTMLInputElement & { dataset: DOMStringMap };
 
-const MAX_COINS_PER_RECORD = 15;
-const CONVERSION_BASE = 45;
+const MAX_COINS_PER_RECORD = appConfig.ui.maxRecordCoins;
+const CONVERSION_BASE = appConfig.ui.recordConversionBase;
 
 export class RecordDialog {
   private backdrop: HTMLElement;
