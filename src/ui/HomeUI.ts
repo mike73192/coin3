@@ -5,10 +5,11 @@ import { debugLogger } from '@/services/DebugLogger';
 import { userSettings } from '@/services/UserSettings';
 import { RecordDialog, type RecordResult } from '@/ui/RecordDialog';
 import { SettingsUI } from '@/ui/SettingsUI';
+import { appConfig } from '@/services/AppConfig';
 
 interface HomeUIOptions {
   onRecord: (coins: number) => void;
-  onKeyboardCoin: () => void;
+  onKeyboardCoin: (coins: number) => void;
 }
 
 export class HomeUI {
@@ -54,8 +55,9 @@ export class HomeUI {
 
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !this.dialog.isVisible()) {
-        debugLogger.log('Enter key pressed. Adding single coin.');
-        this.options.onKeyboardCoin();
+        const increment = appConfig.ui.keyboardCoinIncrement;
+        debugLogger.log('Enter key pressed. Adding coins.', { amount: increment });
+        this.options.onKeyboardCoin(increment);
       }
     });
 

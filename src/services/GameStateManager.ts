@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { ArchiveEntry } from '@/models/archive';
 import { debugLogger } from '@/services/DebugLogger';
 import { userSettings } from '@/services/UserSettings';
+import { appConfig } from '@/services/AppConfig';
 
 const STORAGE_KEY = 'coin3-archives';
 
@@ -20,7 +21,7 @@ export class GameStateManager {
   private emitter = new Phaser.Events.EventEmitter();
   private pendingArchiveTitle: string | null = null;
 
-  constructor(private capacity = 100) {
+  constructor(private capacity = appConfig.coins.jarCapacity) {
     this.capacity = Math.max(20, Math.min(500, Math.round(this.capacity)));
     this.archives = this.loadArchives();
   }

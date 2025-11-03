@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { appConfig } from '@/services/AppConfig';
 
 export interface UserSettings {
   jarCapacity: number;
@@ -13,11 +14,11 @@ type SettingsListener = (settings: UserSettings) => void;
 const STORAGE_KEY = 'coin3-settings';
 
 const DEFAULT_SETTINGS: UserSettings = {
-  jarCapacity: 100,
-  dropInterval: 90,
-  coinBounciness: 0.12,
-  coinFriction: 0.45,
-  coinStaticFriction: 0.9
+  jarCapacity: appConfig.coins.jarCapacity,
+  dropInterval: appConfig.coins.spawnIntervalMs,
+  coinBounciness: appConfig.coins.coinBounciness,
+  coinFriction: appConfig.coins.coinFriction,
+  coinStaticFriction: appConfig.coins.coinStaticFriction
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);

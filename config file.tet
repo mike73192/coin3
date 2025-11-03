@@ -1,0 +1,64 @@
+# coin3 configuration file
+# Adjust values to tune the existing gameplay systems. Only documented options are read by the application.
+
+[graphics]
+# Width of the control panel rendered beside the canvas.
+panelWidth = 320
+# Minimum canvas width in pixels.
+minWidth = 640
+# Minimum canvas height in pixels.
+minHeight = 600
+
+[physics]
+# Horizontal gravity applied to the Matter.js world.
+gravityX = 0
+# Vertical gravity applied to the Matter.js world.
+gravityY = 1
+# Enable Matter.js debug renderer.
+matterDebug = false
+
+[coins]
+# Default jar capacity applied when settings are reset.
+jarCapacity = 100
+# Number of coins spawned per batch while processing the queue.
+dropBatchSize = 6
+# Delay in milliseconds between coins inside a batch.
+spawnIntervalMs = 90
+# Restitution applied to coin bodies.
+coinBounciness = 0.12
+# Kinetic friction applied to coin bodies.
+coinFriction = 0.45
+# Static friction applied to coin bodies.
+coinStaticFriction = 0.9
+# Air drag applied to falling coins.
+coinAirDrag = 0.01
+# Mass applied to each coin body.
+coinMass = 0.6
+# Visual scale of the coin sprite.
+coinScale = 0.5
+# Horizontal randomization around the spawn point in pixels.
+spawnHorizontalJitter = 20
+# Vertical spawn position in pixels.
+spawnStartY = 60
+# Minimum horizontal spawn velocity.
+spawnVelocityXMin = -1
+# Maximum horizontal spawn velocity.
+spawnVelocityXMax = 1
+# Minimum vertical spawn velocity.
+spawnVelocityYMin = -1.8
+# Maximum vertical spawn velocity.
+spawnVelocityYMax = -0.2
+
+[ui]
+# Coins granted when pressing the Enter key shortcut.
+keyboardCoinIncrement = 1
+# Maximum coins a single record can submit before jar limits.
+maxRecordCoins = 15
+# Slider conversion base used to calculate coin totals in the record dialog.
+recordConversionBase = 45
+
+[logging]
+# Enable console output for the debug logger (in addition to storage persistence).
+consoleEnabled = true
+# Maximum number of log entries persisted in local storage.
+maxEntries = 500
