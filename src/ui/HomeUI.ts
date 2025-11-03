@@ -2,7 +2,9 @@ import type { ArchiveEntry } from '@/models/archive';
 import { ARCHIVE_PAGE_SIZE } from '@/models/archive';
 import { gameState } from '@/services/GameStateManager';
 import { debugLogger } from '@/services/DebugLogger';
+import { userSettings } from '@/services/UserSettings';
 import { RecordDialog, type RecordResult } from '@/ui/RecordDialog';
+import { SettingsUI } from '@/ui/SettingsUI';
 
 interface HomeUIOptions {
   onRecord: (coins: number) => void;
@@ -11,6 +13,7 @@ interface HomeUIOptions {
 
 export class HomeUI {
   private coinCountLabel = document.getElementById('coin-count') as HTMLElement;
+  private capacityLabel = document.getElementById('capacity-count') as HTMLElement;
   private recordButton = document.getElementById('record-button') as HTMLButtonElement;
   private downloadLogButton = document.getElementById('download-log-button') as HTMLButtonElement;
   private hintText = document.getElementById('hint-text') as HTMLElement;
@@ -19,6 +22,10 @@ export class HomeUI {
   private shelfPageLabel = document.getElementById('shelf-page') as HTMLElement;
   private prevButton = document.getElementById('shelf-prev') as HTMLButtonElement;
   private nextButton = document.getElementById('shelf-next') as HTMLButtonElement;
+  private homeTabButton = document.getElementById('tab-home') as HTMLButtonElement;
+  private settingsTabButton = document.getElementById('tab-settings') as HTMLButtonElement;
+  private homePanel = document.getElementById('home-view') as HTMLElement;
+  private settingsPanel = document.getElementById('settings-view') as HTMLElement;
   private readonly dialog: RecordDialog;
 
   private currentPage = 0;
@@ -27,6 +34,7 @@ export class HomeUI {
 
   constructor(private readonly options: HomeUIOptions) {
     this.dialog = new RecordDialog((result) => this.handleRecordSubmit(result));
+    new SettingsUI();
 
     this.recordButton.addEventListener('click', () => {
       debugLogger.log('Record button clicked.');
@@ -41,6 +49,9 @@ export class HomeUI {
     this.prevButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
     this.nextButton.addEventListener('click', () => this.goToPage(this.currentPage + 1));
 
+    this.homeTabButton.addEventListener('click', () => this.switchView('home'));
+    this.settingsTabButton.addEventListener('click', () => this.switchView('settings'));
+
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !this.dialog.isVisible()) {
         debugLogger.log('Enter key pressed. Adding single coin.');
@@ -51,9 +62,12 @@ export class HomeUI {
     gameState.on('coinsChanged', (value) => this.updateCoinCount(value));
     gameState.on('jarFilled', (entry, _overflow) => this.handleJarFilled(entry));
     gameState.on('archivesUpdated', (entries) => this.refreshArchives(entries));
+    gameState.on('capacityChanged', (capacity) => this.updateCapacity(capacity));
 
     this.refreshArchives(gameState.getArchives());
     this.updateCoinCount(gameState.getCoinCount());
+    this.updateCapacity(gameState.getCapacity());
+    this.switchView('home');
   }
 
   private handleRecordSubmit(result: RecordResult): void {
@@ -73,7 +87,8 @@ export class HomeUI {
 
   private updateCoinCount(count: number): void {
     this.coinCountLabel.textContent = `${count}`;
-    const ratio = count / gameState.getCapacity();
+    const capacity = gameState.getCapacity();
+    const ratio = count / capacity;
     const hint = ratio >= 0.75
       ? 'あと少しで満杯！'
       : ratio >= 0.5
@@ -81,6 +96,15 @@ export class HomeUI {
         : '今日も少しずつ積み上げましょう。';
     this.hintText.textContent = hint;
     debugLogger.log('Coin count label updated.', { count, hint });
+  }
+
+  private updateCapacity(capacity: number): void {
+    this.capacityLabel.textContent = `${capacity}`;
+    const settings = userSettings.getSettings();
+    if (settings.jarCapacity !== capacity) {
+      userSettings.updateSettings({ jarCapacity: capacity });
+    }
+    this.updateCoinCount(gameState.getCoinCount());
   }
 
   private handleJarFilled(entry: ArchiveEntry): void {
@@ -156,5 +180,15 @@ export class HomeUI {
   private showToast(): void {
     this.toast.classList.remove('hidden');
     setTimeout(() => this.toast.classList.add('hidden'), 2800);
+  }
+
+  private switchView(view: 'home' | 'settings'): void {
+    const isHome = view === 'home';
+    this.homeTabButton.classList.toggle('active', isHome);
+    this.settingsTabButton.classList.toggle('active', !isHome);
+    this.homePanel.classList.toggle('hidden', !isHome);
+    this.settingsPanel.classList.toggle('hidden', isHome);
+    this.homeTabButton.setAttribute('aria-pressed', isHome ? 'true' : 'false');
+    this.settingsTabButton.setAttribute('aria-pressed', !isHome ? 'true' : 'false');
   }
 }
