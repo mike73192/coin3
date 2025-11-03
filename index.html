@@ -10,28 +10,75 @@
     <div id="app">
       <div id="game-container"></div>
       <aside id="ui-panel" class="panel">
-        <section class="status-block">
-          <h1>コインの記録</h1>
-          <p class="hint" id="hint-text">今日も少しずつ積み上げましょう。</p>
-          <div class="counter">
-            <span>現在の枚数</span>
-            <strong id="coin-count">0</strong>
-            <span class="separator">/ 100</span>
-          </div>
-          <button id="record-button" class="primary">記録</button>
-          <button id="download-log-button" class="ghost">ログを保存</button>
-        </section>
-        <section class="shelf-block">
-          <div class="shelf-header">
-            <h2>棚の成果</h2>
-            <div class="pager">
-              <button id="shelf-prev" class="ghost" aria-label="前のページ">◀</button>
-              <span id="shelf-page">1 / 1</span>
-              <button id="shelf-next" class="ghost" aria-label="次のページ">▶</button>
+        <nav class="tab-nav" aria-label="サイドパネル切り替え">
+          <button id="tab-home" type="button" class="tab-button active" aria-pressed="true">記録</button>
+          <button id="tab-settings" type="button" class="tab-button" aria-pressed="false">設定</button>
+        </nav>
+        <div id="home-view" class="panel-view">
+          <section class="status-block">
+            <h1>コインの記録</h1>
+            <p class="hint" id="hint-text">今日も少しずつ積み上げましょう。</p>
+            <div class="counter">
+              <span>現在の枚数</span>
+              <strong id="coin-count">0</strong>
+              <span class="separator">/ <span id="capacity-count">100</span></span>
             </div>
-          </div>
-          <div id="shelf-grid" class="shelf-grid"></div>
-        </section>
+            <button id="record-button" class="primary">記録</button>
+            <button id="download-log-button" class="ghost">ログを保存</button>
+          </section>
+          <section class="shelf-block">
+            <div class="shelf-header">
+              <h2>棚の成果</h2>
+              <div class="pager">
+                <button id="shelf-prev" class="ghost" aria-label="前のページ">◀</button>
+                <span id="shelf-page">1 / 1</span>
+                <button id="shelf-next" class="ghost" aria-label="次のページ">▶</button>
+              </div>
+            </div>
+            <div id="shelf-grid" class="shelf-grid"></div>
+          </section>
+        </div>
+        <div id="settings-view" class="panel-view hidden">
+          <section class="settings-block">
+            <h2>基本設定</h2>
+            <p class="settings-intro">瓶やコインの挙動をお好みに合わせて調整できます。</p>
+            <form id="settings-form" class="settings-form">
+              <label class="field">
+                <span>瓶の容量</span>
+                <input id="settings-capacity" type="number" min="20" max="500" step="10" />
+                <small>20〜500枚の範囲で設定できます。</small>
+              </label>
+              <label class="field range">
+                <div class="label-row">
+                  <span>コイン投入間隔</span>
+                  <span id="settings-drop-label" class="value">90 ms</span>
+                </div>
+                <input id="settings-drop-interval" type="range" min="30" max="400" step="10" />
+              </label>
+              <label class="field range">
+                <div class="label-row">
+                  <span>弾みやすさ</span>
+                  <span id="settings-bounce-label" class="value">0.12</span>
+                </div>
+                <input id="settings-bounce" type="range" min="0" max="0.8" step="0.02" />
+              </label>
+              <label class="field range">
+                <div class="label-row">
+                  <span>摩擦</span>
+                  <span id="settings-friction-label" class="value">0.45</span>
+                </div>
+                <input id="settings-friction" type="range" min="0" max="1" step="0.05" />
+              </label>
+              <label class="field range">
+                <div class="label-row">
+                  <span>静止摩擦</span>
+                  <span id="settings-static-label" class="value">0.90</span>
+                </div>
+                <input id="settings-static-friction" type="range" min="0" max="1" step="0.05" />
+              </label>
+            </form>
+          </section>
+        </div>
       </aside>
     </div>
 

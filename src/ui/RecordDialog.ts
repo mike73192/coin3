@@ -41,6 +41,7 @@ export class RecordDialog {
       this.hide();
     });
     this.sliders.forEach((slider) => slider.addEventListener('input', () => this.updatePreview()));
+    gameState.on('capacityChanged', () => this.updatePreview());
     this.updatePreview();
   }
 

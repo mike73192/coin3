@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { ArchiveEntry } from '@/models/archive';
 import { debugLogger } from '@/services/DebugLogger';
+import { userSettings } from '@/services/UserSettings';
 
 const STORAGE_KEY = 'coin3-archives';
 
@@ -8,6 +9,7 @@ export interface GameStateEvents {
   coinsChanged: (count: number) => void;
   jarFilled: (entry: ArchiveEntry, overflow: number) => void;
   archivesUpdated: (entries: ArchiveEntry[]) => void;
+  capacityChanged: (capacity: number) => void;
 }
 
 type EventKey = keyof GameStateEvents;
@@ -18,7 +20,8 @@ export class GameStateManager {
   private emitter = new Phaser.Events.EventEmitter();
   private pendingArchiveTitle: string | null = null;
 
-  constructor(private readonly capacity = 100) {
+  constructor(private capacity = 100) {
+    this.capacity = Math.max(20, Math.min(500, Math.round(this.capacity)));
     this.archives = this.loadArchives();
   }
 
@@ -36,6 +39,20 @@ export class GameStateManager {
 
   getCapacity(): number {
     return this.capacity;
+  }
+
+  setCapacity(value: number): void {
+    const normalized = Math.max(20, Math.min(500, Math.round(value)));
+    if (normalized === this.capacity) {
+      return;
+    }
+    this.capacity = normalized;
+    if (this.coins > this.capacity) {
+      this.coins = this.capacity;
+      this.emitter.emit('coinsChanged', this.coins);
+    }
+    this.emitter.emit('capacityChanged', this.capacity);
+    debugLogger.log('Capacity updated.', { capacity: this.capacity });
   }
 
   getArchives(): ArchiveEntry[] {
@@ -146,11 +163,16 @@ export class GameStateManager {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '700 32px "Noto Sans JP", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('100', canvas.width / 2, 56);
+    ctx.fillText(`${this.capacity}`, canvas.width / 2, 56);
     ctx.font = '500 16px "Noto Sans JP", sans-serif';
     ctx.fillText(title.slice(0, 10), canvas.width / 2, 88);
     return canvas.toDataURL('image/png');
   }
 }
 
-export const gameState = new GameStateManager();
+const initialCapacity = userSettings.getSettings().jarCapacity;
+export const gameState = new GameStateManager(initialCapacity);
+
+userSettings.onChange((settings) => {
+  gameState.setCapacity(settings.jarCapacity);
+});
