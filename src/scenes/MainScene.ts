@@ -35,7 +35,7 @@ const BOTTLE_INTERIOR_PROFILE = [
   { imageY: 800, width: 441 },
   { imageY: 880, width: 432 },
   { imageY: 920, width: 386 },
-  { imageY: 960, width: 86 }
+  { imageY: 930, width: 86 }
 ];
 
 export class MainScene extends Phaser.Scene {

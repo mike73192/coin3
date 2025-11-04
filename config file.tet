@@ -37,9 +37,9 @@ coinMass = 0.6
 # Visual scale of the coin sprite.
 coinScale = 0.5
 # Horizontal randomization around the spawn point in pixels.
-spawnHorizontalJitter = 20
+spawnHorizontalJitter = 10
 # Vertical spawn position in pixels.
-spawnStartY = 60
+spawnStartY = 260
 # Minimum horizontal spawn velocity.
 spawnVelocityXMin = -1
 # Maximum horizontal spawn velocity.
