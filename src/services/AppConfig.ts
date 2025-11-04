@@ -34,6 +34,7 @@ export interface UIConfig {
   keyboardCoinIncrement: number;
   maxRecordCoins: number;
   recordConversionBase: number;
+  recordSliderFormula: string;
 }
 
 export interface LoggingConfig {
@@ -82,7 +83,8 @@ const DEFAULT_CONFIG: AppConfig = {
   ui: {
     keyboardCoinIncrement: 1,
     maxRecordCoins: 15,
-    recordConversionBase: 45
+    recordConversionBase: 45,
+    recordSliderFormula: 'value * weight'
   },
   logging: {
     consoleEnabled: true,
@@ -147,6 +149,14 @@ function normalizeRange(a: number, b: number): [number, number] {
   return a <= b ? [a, b] : [b, a];
 }
 
+function parseString(value: string | undefined, fallback: string): string {
+  if (value === undefined) {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
 function buildConfig(raw: RawConfig): AppConfig {
   const graphicsSection = raw['graphics'] ?? {};
   const physicsSection = raw['physics'] ?? {};
@@ -197,7 +207,8 @@ function buildConfig(raw: RawConfig): AppConfig {
     ui: {
       keyboardCoinIncrement: Math.max(1, Math.round(parseNumber(uiSection['keyboardCoinIncrement'], DEFAULT_CONFIG.ui.keyboardCoinIncrement))),
       maxRecordCoins: Math.max(1, Math.round(parseNumber(uiSection['maxRecordCoins'], DEFAULT_CONFIG.ui.maxRecordCoins))),
-      recordConversionBase: Math.max(1, Math.round(parseNumber(uiSection['recordConversionBase'], DEFAULT_CONFIG.ui.recordConversionBase)))
+      recordConversionBase: Math.max(1, Math.round(parseNumber(uiSection['recordConversionBase'], DEFAULT_CONFIG.ui.recordConversionBase))),
+      recordSliderFormula: parseString(uiSection['recordSliderFormula'], DEFAULT_CONFIG.ui.recordSliderFormula)
     },
     logging: {
       consoleEnabled: parseBoolean(loggingSection['consoleEnabled'], DEFAULT_CONFIG.logging.consoleEnabled),
