@@ -11,6 +11,7 @@ export interface GameStateEvents {
   jarFilled: (entry: ArchiveEntry, overflow: number) => void;
   archivesUpdated: (entries: ArchiveEntry[]) => void;
   capacityChanged: (capacity: number) => void;
+  totalsChanged: (totals: { coins: number; tasks: number }) => void;
 }
 
 type EventKey = keyof GameStateEvents;
@@ -20,6 +21,7 @@ export class GameStateManager {
   private archives: ArchiveEntry[] = [];
   private emitter = new Phaser.Events.EventEmitter();
   private pendingArchiveTitle: string | null = null;
+  private currentTasks: string[] = [];
 
   constructor(private capacity = appConfig.coins.jarCapacity) {
     this.capacity = Math.max(20, Math.min(500, Math.round(this.capacity)));
@@ -54,14 +56,38 @@ export class GameStateManager {
     }
     this.emitter.emit('capacityChanged', this.capacity);
     debugLogger.log('Capacity updated.', { capacity: this.capacity });
+    this.emitTotals();
   }
 
   getArchives(): ArchiveEntry[] {
     return [...this.archives];
   }
 
+  getTotalCoins(): number {
+    return this.archives.reduce((sum, entry) => sum + entry.coins, this.coins);
+  }
+
+  getTotalTasks(): number {
+    const archivedTasks = this.archives.reduce((sum, entry) => sum + (entry.tasks?.length ?? 0), 0);
+    return archivedTasks + this.currentTasks.length;
+  }
+
   setPendingTitle(title: string | null): void {
     this.pendingArchiveTitle = title;
+  }
+
+  registerTasks(tasks: string[]): void {
+    const normalized = tasks
+      .map((task) => task.trim())
+      .filter((task) => task.length > 0);
+
+    if (normalized.length === 0) {
+      return;
+    }
+
+    this.currentTasks.push(...normalized);
+    debugLogger.log('Tasks registered for current jar.', { count: normalized.length });
+    this.emitTotals();
   }
 
   addCoins(amount: number): { added: number; overflow: number; jarFilled: boolean } {
@@ -77,6 +103,7 @@ export class GameStateManager {
     this.coins += added;
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coins added to jar.', { amount, added, overflow, total: this.coins });
+    this.emitTotals();
 
     if (this.coins >= this.capacity) {
       const entry = this.createArchiveEntry();
@@ -92,6 +119,7 @@ export class GameStateManager {
       });
       this.emitter.emit('jarFilled', entry, overflow);
       this.emitter.emit('archivesUpdated', this.getArchives());
+      this.currentTasks = [];
       this.resetCoins(0);
       return { added, overflow, jarFilled: true };
     }
@@ -103,6 +131,7 @@ export class GameStateManager {
     this.coins = Math.max(0, Math.min(initial, this.capacity));
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coin count reset.', { value: this.coins });
+    this.emitTotals();
   }
 
   private createArchiveEntry(): ArchiveEntry {
@@ -115,7 +144,8 @@ export class GameStateManager {
       title,
       coins: this.capacity,
       createdAt: now.toISOString(),
-      thumbnailUrl: this.generateThumbnail(title, now)
+      thumbnailUrl: this.generateThumbnail(title, now),
+      tasks: [...this.currentTasks]
     };
   }
 
@@ -128,7 +158,15 @@ export class GameStateManager {
       if (!raw) return [];
       const list = JSON.parse(raw) as ArchiveEntry[];
       if (!Array.isArray(list)) return [];
-      return list;
+      return list.map((entry) => ({
+        ...entry,
+        tasks: Array.isArray((entry as Partial<ArchiveEntry>).tasks)
+          ? (entry.tasks as string[])
+            .filter((task) => typeof task === 'string')
+            .map((task) => task.trim())
+            .filter((task) => task.length > 0)
+          : []
+      }));
     } catch (error) {
       console.warn('Failed to load archives', error);
       return [];
@@ -144,6 +182,14 @@ export class GameStateManager {
     } catch (error) {
       console.warn('Failed to persist archives', error);
     }
+  }
+
+  private emitTotals(): void {
+    const totals = {
+      coins: this.getTotalCoins(),
+      tasks: this.getTotalTasks()
+    };
+    this.emitter.emit('totalsChanged', totals);
   }
 
   private generateThumbnail(title: string, now: Date): string {
