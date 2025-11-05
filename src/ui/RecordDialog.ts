@@ -1,12 +1,10 @@
 import { gameState } from '@/services/GameStateManager';
 import { debugLogger } from '@/services/DebugLogger';
 import { appConfig } from '@/services/AppConfig';
-import type { RecordedTask } from '@/models/archive';
 
 export interface RecordResult {
   title: string;
   coins: number;
-  tasks: RecordedTask[];
 }
 
 type SliderElement = HTMLInputElement & { dataset: DOMStringMap };
@@ -47,7 +45,6 @@ export class RecordDialog {
   private backdrop: HTMLElement;
   private form: HTMLFormElement;
   private titleInput: HTMLInputElement;
-  private taskInput: HTMLTextAreaElement;
   private preview: HTMLElement;
   private sliders: SliderElement[];
   private sliderValueDisplays = new Map<SliderElement, HTMLElement>();
@@ -58,14 +55,13 @@ export class RecordDialog {
     this.backdrop = document.getElementById('dialog-backdrop') as HTMLElement;
     this.form = document.getElementById('record-form') as HTMLFormElement;
     this.titleInput = document.getElementById('record-title') as HTMLInputElement;
-    this.taskInput = document.getElementById('record-tasks') as HTMLTextAreaElement;
     this.preview = document.getElementById('record-preview') as HTMLElement;
     this.cancelButton = document.getElementById('dialog-cancel') as HTMLButtonElement;
     this.sliders = Array.from(this.form.querySelectorAll('input[type="range"]')) as SliderElement[];
 
     this.form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const result = this.buildResult();
+      const result = this.calculate();
       this.onSubmit(result);
       this.hide();
       debugLogger.log('Record dialog form submitted.', { result });
@@ -101,7 +97,6 @@ export class RecordDialog {
   hide(): void {
     this.backdrop.classList.add('hidden');
     this.form.reset();
-    this.taskInput.value = '';
     this.sliders.forEach((slider) => {
       slider.value = slider.defaultValue;
     });
@@ -114,7 +109,7 @@ export class RecordDialog {
     return this.visible;
   }
 
-  private computeRecord(): { title: string; coins: number } {
+  private calculate(): RecordResult {
     const totalScore = this.sliders.reduce((sum, slider) => {
       const value = Number(slider.value) || 0;
       const weight = Number(slider.dataset.weight ?? '1');
@@ -127,61 +122,17 @@ export class RecordDialog {
       Math.max(0, Math.round(totalScore / CONVERSION_BASE))
     );
 
-    return {
+    const result: RecordResult = {
       title: this.titleInput.value.trim() || '今日の成果',
       coins
     };
-  }
 
-  private buildResult(): RecordResult {
-    const base = this.computeRecord();
-    const tasks = this.collectTasks();
-    return { ...base, tasks };
-  }
-
-  private collectTasks(): RecordedTask[] {
-    const raw = this.taskInput.value ?? '';
-    return raw
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => this.parseTask(line))
-      .filter((task): task is RecordedTask => task !== null);
-  }
-
-  private parseTask(line: string): RecordedTask | null {
-    if (!line) {
-      return null;
-    }
-
-    const separatorMatch = line.match(/^(.+?)[|｜:：](.+)$/);
-    if (separatorMatch) {
-      const title = separatorMatch[1]?.trim() ?? '';
-      const detail = separatorMatch[2]?.trim() ?? '';
-
-      if (title.length === 0 && detail.length === 0) {
-        return null;
-      }
-
-      if (title.length === 0) {
-        return { title: detail, detail: null };
-      }
-
-      return {
-        title,
-        detail: detail.length > 0 ? detail : null
-      };
-    }
-
-    const title = line.trim();
-    if (title.length === 0) {
-      return null;
-    }
-    return { title, detail: null };
+    // 予測値が0であってもプレビューで確認できるよう保持
+    return result;
   }
 
   private updatePreview(): void {
-    const currentCoins = this.computeRecord().coins;
+    const currentCoins = this.calculate().coins;
     const available = gameState.getCapacity() - gameState.getCoinCount();
     const capped = Math.min(currentCoins, Math.max(0, available));
     this.preview.textContent = `${capped}枚 (上限 ${MAX_COINS_PER_RECORD}枚)`;
