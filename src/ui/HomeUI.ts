@@ -169,17 +169,28 @@ export class HomeUI {
     this.archives = entries;
     const totalPages = Math.max(1, Math.ceil(entries.length / ARCHIVE_PAGE_SIZE));
     this.currentPage = Math.min(this.currentPage, totalPages - 1);
-    if (this.selectedArchiveId) {
-      const exists = this.archives.some((item) => item.id === this.selectedArchiveId);
-      if (!exists) {
-        const fallback = this.archives[0];
-        this.selectedArchiveId = fallback ? fallback.id : null;
-        if (fallback) {
-          this.currentPage = 0;
+
+    if (this.archives.length === 0) {
+      this.selectedArchiveId = null;
+    } else {
+      const selectedIndex = this.selectedArchiveId
+        ? this.archives.findIndex((item) => item.id === this.selectedArchiveId)
+        : -1;
+
+      if (selectedIndex >= 0) {
+        const pageOfSelection = Math.floor(selectedIndex / ARCHIVE_PAGE_SIZE);
+        if (pageOfSelection !== this.currentPage) {
+          this.currentPage = pageOfSelection;
+        }
+      } else {
+        const startIndex = this.currentPage * ARCHIVE_PAGE_SIZE;
+        const fallback = this.archives[startIndex] ?? this.archives[0];
+        this.selectedArchiveId = fallback?.id ?? null;
+        if (this.selectedArchiveId) {
+          const fallbackIndex = this.archives.findIndex((item) => item.id === this.selectedArchiveId);
+          this.currentPage = Math.floor(fallbackIndex / ARCHIVE_PAGE_SIZE);
         }
       }
-    } else if (this.archives.length === 0) {
-      this.selectedArchiveId = null;
     }
     this.renderShelf();
     this.updateDetailView();
@@ -192,7 +203,20 @@ export class HomeUI {
       return;
     }
     this.currentPage = clamped;
+
+    const startIndex = this.currentPage * ARCHIVE_PAGE_SIZE;
+    const pageItems = this.archives.slice(startIndex, startIndex + ARCHIVE_PAGE_SIZE);
+    if (pageItems.length > 0) {
+      const hasSelectionOnPage = pageItems.some((item) => item.id === this.selectedArchiveId);
+      if (!hasSelectionOnPage) {
+        this.selectedArchiveId = pageItems[0].id;
+      }
+    } else {
+      this.selectedArchiveId = null;
+    }
+
     this.renderShelf();
+    this.updateDetailView();
   }
 
   private renderShelf(): void {
@@ -254,9 +278,23 @@ export class HomeUI {
 
   private selectArchive(id: string): void {
     if (this.selectedArchiveId === id) {
+      this.selectedArchiveId = null;
+      debugLogger.log('Archive entry deselected.', { id });
+      this.updateDetailView();
+      this.renderShelf();
       return;
     }
+
     this.selectedArchiveId = id;
+
+    const selectedIndex = this.archives.findIndex((item) => item.id === id);
+    if (selectedIndex >= 0) {
+      const pageOfSelection = Math.floor(selectedIndex / ARCHIVE_PAGE_SIZE);
+      if (pageOfSelection !== this.currentPage) {
+        this.currentPage = pageOfSelection;
+      }
+    }
+
     debugLogger.log('Archive entry selected.', { id });
     this.updateDetailView();
     this.renderShelf();
@@ -348,13 +386,15 @@ export class HomeUI {
       detail.id = detailId;
       toggle.setAttribute('aria-controls', detailId);
 
-      toggle.addEventListener('click', () => {
+      const toggleDetail = () => {
         const expanded = toggle.getAttribute('aria-expanded') === 'true';
         const nextExpanded = !expanded;
         toggle.setAttribute('aria-expanded', nextExpanded.toString());
         detail.hidden = !nextExpanded;
         item.classList.toggle('expanded', nextExpanded);
-      });
+      };
+
+      toggle.addEventListener('click', toggleDetail);
 
       toggle.append(label, icon);
       item.append(toggle, detail);
