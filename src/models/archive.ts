@@ -4,7 +4,6 @@ export interface ArchiveEntry {
   coins: number;
   createdAt: string;
   thumbnailUrl: string;
-  tasks: string[];
 }
 
 export const ARCHIVE_PAGE_SIZE = 6;
