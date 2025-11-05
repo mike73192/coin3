@@ -279,6 +279,24 @@ button:disabled {
   accent-color: #5f7aff;
 }
 
+.field.sliders .slider-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.field.sliders .slider-control input[type='range'] {
+  flex: 1;
+}
+
+.field.sliders .slider-value {
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #3b4b66;
+  font-weight: 600;
+}
+
 .field.range input[type='range'] {
   width: 100%;
   accent-color: #5f7aff;

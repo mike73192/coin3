@@ -56,6 +56,8 @@ keyboardCoinIncrement = 1
 maxRecordCoins = 15
 # Slider conversion base used to calculate coin totals in the record dialog.
 recordConversionBase = 45
+# Formula applied to each slider before summing their contributions. Available variables: value, weight, Math.
+recordSliderFormula = value * weight
 
 [logging]
 # Enable console output for the debug logger (in addition to storage persistence).

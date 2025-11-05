@@ -11,6 +11,35 @@ type SliderElement = HTMLInputElement & { dataset: DOMStringMap };
 
 const MAX_COINS_PER_RECORD = appConfig.ui.maxRecordCoins;
 const CONVERSION_BASE = appConfig.ui.recordConversionBase;
+const SLIDER_FORMULA = appConfig.ui.recordSliderFormula;
+
+type SliderFormula = (value: number, weight: number) => number;
+type CompiledSliderFormula = (value: number, weight: number, math: typeof Math) => number;
+
+function createSliderFormulaEvaluator(formula: string): SliderFormula {
+  const expression = formula?.trim() ?? '';
+  if (!expression) {
+    return (value, weight) => value * weight;
+  }
+
+  try {
+    const evaluator = new Function('value', 'weight', 'Math', `return ${expression};`) as CompiledSliderFormula;
+    // Validate the evaluator once to ensure it returns a finite number for nominal inputs.
+    const probe = evaluator(1, 1, Math);
+    if (typeof probe !== 'number' || !Number.isFinite(probe)) {
+      throw new Error('Formula must return a finite number.');
+    }
+    return (value: number, weight: number) => {
+      const result = evaluator(value, weight, Math);
+      return Number.isFinite(result) ? result : 0;
+    };
+  } catch (error) {
+    console.warn('Invalid record slider formula. Falling back to default.', error);
+    return (value, weight) => value * weight;
+  }
+}
+
+const evaluateSlider = createSliderFormulaEvaluator(SLIDER_FORMULA);
 
 export class RecordDialog {
   private backdrop: HTMLElement;
@@ -18,6 +47,7 @@ export class RecordDialog {
   private titleInput: HTMLInputElement;
   private preview: HTMLElement;
   private sliders: SliderElement[];
+  private sliderValueDisplays = new Map<SliderElement, HTMLElement>();
   private cancelButton: HTMLButtonElement;
   private visible = false;
 
@@ -41,7 +71,16 @@ export class RecordDialog {
       debugLogger.log('Record dialog cancelled.');
       this.hide();
     });
-    this.sliders.forEach((slider) => slider.addEventListener('input', () => this.updatePreview()));
+    this.sliders.forEach((slider) => {
+      const display = slider.closest('label')?.querySelector('[data-slider-value]') as HTMLElement | null;
+      if (display) {
+        this.sliderValueDisplays.set(slider, display);
+      }
+      slider.addEventListener('input', () => {
+        this.updateSliderDisplay(slider);
+        this.updatePreview();
+      });
+    });
     gameState.on('capacityChanged', () => this.updatePreview());
     this.updatePreview();
   }
@@ -74,7 +113,8 @@ export class RecordDialog {
     const totalScore = this.sliders.reduce((sum, slider) => {
       const value = Number(slider.value) || 0;
       const weight = Number(slider.dataset.weight ?? '1');
-      return sum + value * weight;
+      const contribution = evaluateSlider(value, weight);
+      return sum + contribution;
     }, 0);
 
     const coins = Math.min(
@@ -96,6 +136,20 @@ export class RecordDialog {
     const available = gameState.getCapacity() - gameState.getCoinCount();
     const capped = Math.min(currentCoins, Math.max(0, available));
     this.preview.textContent = `${capped}枚 (上限 ${MAX_COINS_PER_RECORD}枚)`;
+    this.syncSliderDisplays();
     debugLogger.log('Record dialog preview updated.', { currentCoins, capped, available });
+  }
+
+  private syncSliderDisplays(): void {
+    this.sliders.forEach((slider) => this.updateSliderDisplay(slider));
+  }
+
+  private updateSliderDisplay(slider: SliderElement): void {
+    const display = this.sliderValueDisplays.get(slider);
+    if (!display) {
+      return;
+    }
+    const numericValue = Number(slider.value);
+    display.textContent = Number.isFinite(numericValue) ? `${Math.round(numericValue)}` : '0';
   }
 }
