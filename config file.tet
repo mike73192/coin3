@@ -1,66 +1,66 @@
-# coin3 configuration file
-# Adjust values to tune the existing gameplay systems. Only documented options are read by the application.
+# coin3 の設定ファイル
+# 値を調整して既存のゲームプレイをチューニングします。アプリが読み込むのは説明付きの項目だけです。
 
 [graphics]
-# Width of the control panel rendered beside the canvas.
+# キャンバス横に表示されるコントロールパネルの幅。
 panelWidth = 320
-# Minimum canvas width in pixels.
+# キャンバスの最小幅（px）。
 minWidth = 640
-# Minimum canvas height in pixels.
+# キャンバスの最小高さ（px）。
 minHeight = 600
 
 [physics]
-# Horizontal gravity applied to the Matter.js world.
+# Matter.js のワールドにかかる水平方向の重力。
 gravityX = 0
-# Vertical gravity applied to the Matter.js world.
+# Matter.js のワールドにかかる垂直方向の重力。
 gravityY = 1
-# Enable Matter.js debug renderer.
+# Matter.js のデバッグレンダラーを有効化。
 matterDebug = false
 
 [coins]
-# Default jar capacity applied when settings are reset.
+# 設定をリセットしたときに使われるジャーのデフォルト容量。
 jarCapacity = 100
-# Number of coins spawned per batch while processing the queue.
+# キュー処理中、1バッチで生成するコイン数。
 dropBatchSize = 6
-# Delay in milliseconds between coins inside a batch.
+# 同一バッチ内でコインを出す間隔（ミリ秒）。
 spawnIntervalMs = 90
-# Restitution applied to coin bodies.
+# コインの反発係数（弾み具合）。
 coinBounciness = 0.12
-# Kinetic friction applied to coin bodies.
+# コインの動摩擦係数。
 coinFriction = 0.45
-# Static friction applied to coin bodies.
+# コインの静止摩擦係数。
 coinStaticFriction = 0.9
-# Air drag applied to falling coins.
+# 落下中のコインにかかる空気抵抗。
 coinAirDrag = 0.01
-# Mass applied to each coin body.
+# 各コインの質量。
 coinMass = 0.6
-# Visual scale of the coin sprite.
+# コインスプライトの見た目のスケール。
 coinScale = 0.5
-# Horizontal randomization around the spawn point in pixels.
+# スポーン位置の水平方向ランダム幅（px）。
 spawnHorizontalJitter = 10
-# Vertical spawn position in pixels.
-spawnStartY = 260
-# Minimum horizontal spawn velocity.
+# 垂直方向のスポーン位置（px）。
+spawnStartY = 360
+# スポーン時の最小水平速度。
 spawnVelocityXMin = -1
-# Maximum horizontal spawn velocity.
+# スポーン時の最大水平速度。
 spawnVelocityXMax = 1
-# Minimum vertical spawn velocity.
+# スポーン時の最小垂直速度。
 spawnVelocityYMin = -1.8
-# Maximum vertical spawn velocity.
+# スポーン時の最大垂直速度。
 spawnVelocityYMax = -0.2
 
 [ui]
-# Coins granted when pressing the Enter key shortcut.
+# Enterキーのショートカットで追加されるコイン数。
 keyboardCoinIncrement = 1
-# Maximum coins a single record can submit before jar limits.
-maxRecordCoins = 15
-# Slider conversion base used to calculate coin totals in the record dialog.
-recordConversionBase = 45
-# Formula applied to each slider before summing their contributions. Available variables: value, weight, Math.
+# ジャーの上限判定前に、1レコードが投稿できるコインの最大数。
+maxRecordCoins = 30
+# レコードダイアログで合計コインを計算するためのスライダー換算の基準値。
+recordConversionBase = 12.5
+# 合計する前に各スライダーへ適用する式。使える変数: value, weight, Math。
 recordSliderFormula = value * weight
 
 [logging]
-# Enable console output for the debug logger (in addition to storage persistence).
+# 保存に加えて、デバッグロガーをコンソールにも出力するか。
 consoleEnabled = true
-# Maximum number of log entries persisted in local storage.
+# ローカルストレージに保存しておくログ件数の上限。
 maxEntries = 500

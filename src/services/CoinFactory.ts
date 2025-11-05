@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { userSettings } from '@/services/UserSettings';
 import { appConfig } from '@/services/AppConfig';
 
-const COIN_RADIUS = 14;
+const COIN_RADIUS = 30;
 const COIN_SCALE = appConfig.coins.coinScale;
 
 export class CoinFactory {

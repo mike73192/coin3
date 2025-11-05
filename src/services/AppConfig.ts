@@ -74,7 +74,7 @@ const DEFAULT_CONFIG: AppConfig = {
     coinMass: 0.6,
     coinScale: 0.5,
     spawnHorizontalJitter: 20,
-    spawnStartY: 60,
+    spawnStartY: 120,
     spawnVelocityXMin: -1,
     spawnVelocityXMax: 1,
     spawnVelocityYMin: -1.8,
