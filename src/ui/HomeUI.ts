@@ -18,9 +18,17 @@ export class HomeUI {
   private recordButton = document.getElementById('record-button') as HTMLButtonElement;
   private downloadLogButton = document.getElementById('download-log-button') as HTMLButtonElement;
   private hintText = document.getElementById('hint-text') as HTMLElement;
+  private totalCoinsLabel = document.getElementById('total-coins') as HTMLElement;
+  private totalTasksLabel = document.getElementById('total-tasks') as HTMLElement;
   private toast = document.getElementById('full-toast') as HTMLElement;
   private shelfGrid = document.getElementById('shelf-grid') as HTMLElement;
   private shelfPageLabel = document.getElementById('shelf-page') as HTMLElement;
+  private detailPlaceholder = document.getElementById('archive-detail-placeholder') as HTMLElement;
+  private detailPanel = document.getElementById('archive-detail') as HTMLElement;
+  private detailTitle = document.getElementById('detail-title') as HTMLElement;
+  private detailDate = document.getElementById('detail-date') as HTMLElement;
+  private detailCoins = document.getElementById('detail-coins') as HTMLElement;
+  private detailTasksList = document.getElementById('detail-tasks') as HTMLElement;
   private prevButton = document.getElementById('shelf-prev') as HTMLButtonElement;
   private nextButton = document.getElementById('shelf-next') as HTMLButtonElement;
   private homeTabButton = document.getElementById('tab-home') as HTMLButtonElement;
@@ -31,6 +39,7 @@ export class HomeUI {
 
   private currentPage = 0;
   private archives: ArchiveEntry[] = [];
+  private selectedArchiveId: string | null = null;
   private lastRecordTitle: string | null = null;
 
   constructor(private readonly options: HomeUIOptions) {
@@ -65,20 +74,27 @@ export class HomeUI {
     gameState.on('jarFilled', (entry, _overflow) => this.handleJarFilled(entry));
     gameState.on('archivesUpdated', (entries) => this.refreshArchives(entries));
     gameState.on('capacityChanged', (capacity) => this.updateCapacity(capacity));
+    gameState.on('totalsChanged', (totals) => this.updateTotals(totals));
 
     this.refreshArchives(gameState.getArchives());
     this.updateCoinCount(gameState.getCoinCount());
     this.updateCapacity(gameState.getCapacity());
+    this.updateTotals({ coins: gameState.getTotalCoins(), tasks: gameState.getTotalTasks() });
     this.switchView('home');
   }
 
   private handleRecordSubmit(result: RecordResult): void {
-    debugLogger.log('Record dialog submitted.', { title: result.title, coins: result.coins });
+    debugLogger.log('Record dialog submitted.', {
+      title: result.title,
+      coins: result.coins,
+      taskCount: result.tasks.length
+    });
     this.lastRecordTitle = result.title;
     const available = gameState.getCapacity() - gameState.getCoinCount();
     const coins = Math.min(result.coins, Math.max(0, available));
     if (coins > 0) {
       gameState.setPendingTitle(result.title);
+      gameState.registerTasks(result.tasks);
       debugLogger.log('Submitting coins to queue.', { coins });
       this.options.onRecord(coins);
     } else {
@@ -109,15 +125,23 @@ export class HomeUI {
     this.updateCoinCount(gameState.getCoinCount());
   }
 
+  private updateTotals(totals: { coins: number; tasks: number }): void {
+    this.totalCoinsLabel.textContent = totals.coins.toLocaleString('ja-JP');
+    this.totalTasksLabel.textContent = totals.tasks.toLocaleString('ja-JP');
+    debugLogger.log('Total counters updated.', totals);
+  }
+
   private handleJarFilled(entry: ArchiveEntry): void {
     this.showToast();
     this.currentPage = 0;
+    this.selectedArchiveId = entry.id;
     this.refreshArchives([entry, ...this.archives]);
     debugLogger.log('Handled jar filled event.', {
       entry: {
         id: entry.id,
         title: entry.title,
-        createdAt: entry.createdAt
+        createdAt: entry.createdAt,
+        taskCount: entry.tasks.length
       }
     });
   }
@@ -126,7 +150,20 @@ export class HomeUI {
     this.archives = entries;
     const totalPages = Math.max(1, Math.ceil(entries.length / ARCHIVE_PAGE_SIZE));
     this.currentPage = Math.min(this.currentPage, totalPages - 1);
+    if (this.selectedArchiveId) {
+      const exists = this.archives.some((item) => item.id === this.selectedArchiveId);
+      if (!exists) {
+        const fallback = this.archives[0];
+        this.selectedArchiveId = fallback ? fallback.id : null;
+        if (fallback) {
+          this.currentPage = 0;
+        }
+      }
+    } else if (this.archives.length === 0) {
+      this.selectedArchiveId = null;
+    }
     this.renderShelf();
+    this.updateDetailView();
   }
 
   private goToPage(index: number): void {
@@ -161,14 +198,31 @@ export class HomeUI {
 
         const meta = document.createElement('div');
         meta.className = 'meta';
-        meta.textContent = new Date(entry.createdAt).toLocaleDateString('ja-JP');
+        const formattedDate = new Date(entry.createdAt).toLocaleDateString('ja-JP');
+        meta.textContent = `${formattedDate}・タスク${entry.tasks.length}件`;
 
         cell.append(img, title, meta);
+        cell.dataset.archiveId = entry.id;
+        cell.tabIndex = 0;
+        cell.setAttribute('role', 'button');
+        cell.setAttribute('aria-label', `${entry.title} (${formattedDate})`);
+        cell.setAttribute('aria-pressed', entry.id === this.selectedArchiveId ? 'true' : 'false');
+        if (entry.id === this.selectedArchiveId) {
+          cell.classList.add('selected');
+        }
+        cell.addEventListener('click', () => this.selectArchive(entry.id));
+        cell.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            this.selectArchive(entry.id);
+          }
+        });
       } else {
         const placeholder = document.createElement('div');
         placeholder.className = 'title';
         placeholder.textContent = '空きスペース';
         cell.appendChild(placeholder);
+        cell.setAttribute('aria-hidden', 'true');
       }
 
       this.shelfGrid.appendChild(cell);
@@ -177,6 +231,90 @@ export class HomeUI {
     this.shelfPageLabel.textContent = `${this.currentPage + 1} / ${totalPages}`;
     this.prevButton.disabled = this.currentPage === 0;
     this.nextButton.disabled = this.currentPage >= totalPages - 1;
+  }
+
+  private selectArchive(id: string): void {
+    if (this.selectedArchiveId === id) {
+      return;
+    }
+    this.selectedArchiveId = id;
+    debugLogger.log('Archive entry selected.', { id });
+    this.updateDetailView();
+    this.renderShelf();
+  }
+
+  private updateDetailView(): void {
+    if (!this.selectedArchiveId) {
+      this.detailPanel.classList.add('hidden');
+      this.detailPlaceholder.classList.remove('hidden');
+      this.detailTasksList.innerHTML = '';
+      return;
+    }
+
+    const entry = this.archives.find((item) => item.id === this.selectedArchiveId);
+    if (!entry) {
+      this.selectedArchiveId = null;
+      this.updateDetailView();
+      return;
+    }
+
+    this.detailPlaceholder.classList.add('hidden');
+    this.detailPanel.classList.remove('hidden');
+    this.detailTitle.textContent = entry.title;
+    this.detailDate.textContent = new Date(entry.createdAt).toLocaleString('ja-JP');
+    this.detailCoins.textContent = entry.coins.toLocaleString('ja-JP');
+    this.detailTasksList.innerHTML = '';
+
+    if (entry.tasks.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'empty-task';
+      empty.textContent = '記録されたタスクはありません。';
+      this.detailTasksList.appendChild(empty);
+    } else {
+      entry.tasks.forEach((task, index) => {
+        const item = document.createElement('li');
+        item.className = 'task-item';
+
+        if (task.detail) {
+          item.classList.add('has-detail');
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'task-toggle';
+          toggle.textContent = task.title;
+          toggle.setAttribute('aria-expanded', 'false');
+
+          const detail = document.createElement('p');
+          detail.className = 'task-detail';
+          detail.textContent = task.detail;
+          detail.hidden = true;
+
+          const detailId = `task-detail-${entry.id}-${index}`;
+          detail.id = detailId;
+          toggle.setAttribute('aria-controls', detailId);
+
+          toggle.addEventListener('click', () => {
+            const expanded = toggle.getAttribute('aria-expanded') === 'true';
+            toggle.setAttribute('aria-expanded', (!expanded).toString());
+            detail.hidden = expanded;
+            item.classList.toggle('expanded', !expanded);
+          });
+
+          item.append(toggle, detail);
+        } else {
+          const title = document.createElement('span');
+          title.className = 'task-title';
+          title.textContent = task.title;
+          item.appendChild(title);
+        }
+
+        this.detailTasksList.appendChild(item);
+      });
+    }
+
+    debugLogger.log('Archive detail view updated.', {
+      archiveId: entry.id,
+      taskCount: entry.tasks.length
+    });
   }
 
   private showToast(): void {
