@@ -224,8 +224,7 @@ export class GameStateManager {
 
   private normalizeUnknownTask(raw: unknown): RecordedTask | null {
     if (typeof raw === 'string') {
-      const title = raw.trim();
-      return title.length > 0 ? { title, detail: null } : null;
+      return this.parseTaskString(raw);
     }
 
     if (!raw || typeof raw !== 'object') {
@@ -244,6 +243,13 @@ export class GameStateManager {
       return { title: detail, detail: null };
     }
 
+    if (detail.length === 0 && typeof candidate.detail !== 'string' && typeof candidate.title === 'string') {
+      const parsedFromTitle = this.parseTaskString(candidate.title);
+      if (parsedFromTitle) {
+        return parsedFromTitle;
+      }
+    }
+
     return { title, detail: detail.length > 0 ? detail : null };
   }
 
@@ -260,6 +266,34 @@ export class GameStateManager {
     }
 
     return { title, detail: detail.length > 0 ? detail : null };
+  }
+
+  private parseTaskString(value: string): RecordedTask | null {
+    const text = value.trim();
+    if (text.length === 0) {
+      return null;
+    }
+
+    const separatorMatch = text.match(/^(.+?)[|｜:：](.+)$/);
+    if (separatorMatch) {
+      const title = separatorMatch[1]?.trim() ?? '';
+      const detail = separatorMatch[2]?.trim() ?? '';
+
+      if (title.length === 0 && detail.length === 0) {
+        return null;
+      }
+
+      if (title.length === 0) {
+        return { title: detail, detail: null };
+      }
+
+      return {
+        title,
+        detail: detail.length > 0 ? detail : null
+      };
+    }
+
+    return { title: text, detail: null };
   }
 
   private generateThumbnail(title: string, now: Date): string {
