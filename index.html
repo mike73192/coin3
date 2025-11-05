@@ -23,16 +23,6 @@
               <strong id="coin-count">0</strong>
               <span class="separator">/ <span id="capacity-count">100</span></span>
             </div>
-            <div class="totals">
-              <div class="total-item">
-                <span>累計コイン</span>
-                <strong id="total-coins">0</strong>
-              </div>
-              <div class="total-item">
-                <span>累計タスク</span>
-                <strong id="total-tasks">0</strong>
-              </div>
-            </div>
             <button id="record-button" class="primary">記録</button>
             <button id="download-log-button" class="ghost">ログを保存</button>
           </section>
@@ -46,21 +36,6 @@
               </div>
             </div>
             <div id="shelf-grid" class="shelf-grid"></div>
-          </section>
-          <section class="detail-block">
-            <h2>瓶の記録</h2>
-            <p id="archive-detail-placeholder" class="detail-placeholder">棚から瓶を選択すると詳細が表示されます。</p>
-            <div id="archive-detail" class="detail hidden" aria-live="polite">
-              <div class="detail-header">
-                <h3 id="detail-title"></h3>
-                <div class="detail-meta">
-                  <span id="detail-date"></span>
-                  <span>コイン <strong id="detail-coins">0</strong>枚</span>
-                </div>
-              </div>
-              <h4>記録したタスク</h4>
-              <ul id="detail-tasks" class="detail-tasks"></ul>
-            </div>
           </section>
         </div>
         <div id="settings-view" class="panel-view hidden">
@@ -116,11 +91,6 @@
           <label class="field">
             <span>タイトル</span>
             <input id="record-title" type="text" placeholder="今日のがんばり" maxlength="32" required />
-          </label>
-          <label class="field">
-            <span>タスク内容</span>
-            <textarea id="record-tasks" rows="4" placeholder="例: 資料作成｜お客様向け資料を完成"></textarea>
-            <small>1行につき1つのタスクを入力してください。「:」や「｜」で内容を区切れます。タイトルのみでもOKです。</small>
           </label>
           <div class="field sliders">
             <label>

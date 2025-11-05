@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { ArchiveEntry, RecordedTask } from '@/models/archive';
+import type { ArchiveEntry } from '@/models/archive';
 import { debugLogger } from '@/services/DebugLogger';
 import { userSettings } from '@/services/UserSettings';
 import { appConfig } from '@/services/AppConfig';
@@ -11,7 +11,6 @@ export interface GameStateEvents {
   jarFilled: (entry: ArchiveEntry, overflow: number) => void;
   archivesUpdated: (entries: ArchiveEntry[]) => void;
   capacityChanged: (capacity: number) => void;
-  totalsChanged: (totals: { coins: number; tasks: number }) => void;
 }
 
 type EventKey = keyof GameStateEvents;
@@ -21,7 +20,6 @@ export class GameStateManager {
   private archives: ArchiveEntry[] = [];
   private emitter = new Phaser.Events.EventEmitter();
   private pendingArchiveTitle: string | null = null;
-  private currentTasks: RecordedTask[] = [];
 
   constructor(private capacity = appConfig.coins.jarCapacity) {
     this.capacity = Math.max(20, Math.min(500, Math.round(this.capacity)));
@@ -56,38 +54,14 @@ export class GameStateManager {
     }
     this.emitter.emit('capacityChanged', this.capacity);
     debugLogger.log('Capacity updated.', { capacity: this.capacity });
-    this.emitTotals();
   }
 
   getArchives(): ArchiveEntry[] {
     return [...this.archives];
   }
 
-  getTotalCoins(): number {
-    return this.archives.reduce((sum, entry) => sum + entry.coins, this.coins);
-  }
-
-  getTotalTasks(): number {
-    const archivedTasks = this.archives.reduce((sum, entry) => sum + entry.tasks.length, 0);
-    return archivedTasks + this.currentTasks.length;
-  }
-
   setPendingTitle(title: string | null): void {
     this.pendingArchiveTitle = title;
-  }
-
-  registerTasks(tasks: RecordedTask[]): void {
-    const normalized = tasks
-      .map((task) => this.normalizeTask(task))
-      .filter((task): task is RecordedTask => task !== null);
-
-    if (normalized.length === 0) {
-      return;
-    }
-
-    this.currentTasks.push(...normalized);
-    debugLogger.log('Tasks registered for current jar.', { count: normalized.length });
-    this.emitTotals();
   }
 
   addCoins(amount: number): { added: number; overflow: number; jarFilled: boolean } {
@@ -103,7 +77,6 @@ export class GameStateManager {
     this.coins += added;
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coins added to jar.', { amount, added, overflow, total: this.coins });
-    this.emitTotals();
 
     if (this.coins >= this.capacity) {
       const entry = this.createArchiveEntry();
@@ -119,7 +92,6 @@ export class GameStateManager {
       });
       this.emitter.emit('jarFilled', entry, overflow);
       this.emitter.emit('archivesUpdated', this.getArchives());
-      this.currentTasks = [];
       this.resetCoins(0);
       return { added, overflow, jarFilled: true };
     }
@@ -131,7 +103,6 @@ export class GameStateManager {
     this.coins = Math.max(0, Math.min(initial, this.capacity));
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coin count reset.', { value: this.coins });
-    this.emitTotals();
   }
 
   private createArchiveEntry(): ArchiveEntry {
@@ -144,8 +115,7 @@ export class GameStateManager {
       title,
       coins: this.capacity,
       createdAt: now.toISOString(),
-      thumbnailUrl: this.generateThumbnail(title, now),
-      tasks: this.currentTasks.map((task) => ({ ...task }))
+      thumbnailUrl: this.generateThumbnail(title, now)
     };
   }
 
@@ -156,11 +126,9 @@ export class GameStateManager {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return [];
-      const list = JSON.parse(raw) as unknown;
+      const list = JSON.parse(raw) as ArchiveEntry[];
       if (!Array.isArray(list)) return [];
-      return list
-        .map((entry) => this.normalizeArchiveEntry(entry))
-        .filter((entry): entry is ArchiveEntry => entry !== null);
+      return list;
     } catch (error) {
       console.warn('Failed to load archives', error);
       return [];
@@ -176,90 +144,6 @@ export class GameStateManager {
     } catch (error) {
       console.warn('Failed to persist archives', error);
     }
-  }
-
-  private emitTotals(): void {
-    const totals = {
-      coins: this.getTotalCoins(),
-      tasks: this.getTotalTasks()
-    };
-    this.emitter.emit('totalsChanged', totals);
-  }
-
-  private normalizeArchiveEntry(entry: unknown): ArchiveEntry | null {
-    if (!entry || typeof entry !== 'object') {
-      return null;
-    }
-
-    const partial = entry as Partial<ArchiveEntry> & { tasks?: unknown };
-    if (typeof partial.id !== 'string' || typeof partial.title !== 'string' || typeof partial.createdAt !== 'string') {
-      return null;
-    }
-
-    const coins = typeof partial.coins === 'number' && Number.isFinite(partial.coins)
-      ? partial.coins
-      : this.capacity;
-    const thumbnailUrl = typeof partial.thumbnailUrl === 'string' ? partial.thumbnailUrl : '/default-thumb.svg';
-    const tasks = this.normalizeStoredTasks(partial.tasks);
-
-    return {
-      id: partial.id,
-      title: partial.title,
-      coins,
-      createdAt: partial.createdAt,
-      thumbnailUrl,
-      tasks
-    };
-  }
-
-  private normalizeStoredTasks(value: unknown): RecordedTask[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value
-      .map((task) => this.normalizeUnknownTask(task))
-      .filter((task): task is RecordedTask => task !== null);
-  }
-
-  private normalizeUnknownTask(raw: unknown): RecordedTask | null {
-    if (typeof raw === 'string') {
-      const title = raw.trim();
-      return title.length > 0 ? { title, detail: null } : null;
-    }
-
-    if (!raw || typeof raw !== 'object') {
-      return null;
-    }
-
-    const candidate = raw as { title?: unknown; detail?: unknown };
-    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
-    const detail = typeof candidate.detail === 'string' ? candidate.detail.trim() : '';
-
-    if (title.length === 0 && detail.length === 0) {
-      return null;
-    }
-
-    if (title.length === 0) {
-      return { title: detail, detail: null };
-    }
-
-    return { title, detail: detail.length > 0 ? detail : null };
-  }
-
-  private normalizeTask(task: RecordedTask): RecordedTask | null {
-    const title = task.title?.trim() ?? '';
-    const detail = task.detail?.trim() ?? '';
-
-    if (title.length === 0 && detail.length === 0) {
-      return null;
-    }
-
-    if (title.length === 0) {
-      return { title: detail, detail: null };
-    }
-
-    return { title, detail: detail.length > 0 ? detail : null };
   }
 
   private generateThumbnail(title: string, now: Date): string {
