@@ -84,14 +84,31 @@ export class HomeUI {
   }
 
   private handleRecordSubmit(result: RecordResult): void {
+    let tasksToRegister =
+      result.tasks.length > 0
+        ? result.tasks
+        : result.fallbackTask
+          ? [result.fallbackTask]
+          : [];
+
+    if (tasksToRegister.length === 0 && result.title.trim().length > 0) {
+      tasksToRegister = [{ title: result.title, detail: null }];
+    }
+
     debugLogger.log('Record dialog submitted.', {
       title: result.title,
       coins: result.coins,
-      taskCount: result.tasks.length
+      taskCount: tasksToRegister.length,
+      taskSource:
+        result.tasks.length > 0
+          ? 'tasks'
+          : result.fallbackTask
+            ? 'taskInputFallback'
+            : 'titleFallback'
     });
     this.lastRecordTitle = result.title;
-    if (result.tasks.length > 0) {
-      gameState.registerTasks(result.tasks);
+    if (tasksToRegister.length > 0) {
+      gameState.registerTasks(tasksToRegister);
     }
     const available = gameState.getCapacity() - gameState.getCoinCount();
     const coins = Math.min(result.coins, Math.max(0, available));
@@ -274,51 +291,7 @@ export class HomeUI {
       this.detailTasksList.appendChild(empty);
     } else {
       entry.tasks.forEach((task, index) => {
-        const item = document.createElement('li');
-        item.className = 'task-item';
-
-        if (task.detail) {
-          item.classList.add('has-detail');
-          const toggle = document.createElement('button');
-          toggle.type = 'button';
-          toggle.className = 'task-toggle';
-          toggle.setAttribute('aria-expanded', 'false');
-
-          const text = document.createElement('span');
-          text.className = 'task-toggle-text';
-          text.textContent = task.title;
-
-          const icon = document.createElement('span');
-          icon.className = 'task-toggle-icon';
-          icon.setAttribute('aria-hidden', 'true');
-          icon.textContent = '▼';
-
-          const detail = document.createElement('p');
-          detail.className = 'task-detail';
-          detail.textContent = task.detail;
-          detail.hidden = true;
-
-          const detailId = `task-detail-${entry.id}-${index}`;
-          detail.id = detailId;
-          toggle.setAttribute('aria-controls', detailId);
-
-          toggle.addEventListener('click', () => {
-            const expanded = toggle.getAttribute('aria-expanded') === 'true';
-            toggle.setAttribute('aria-expanded', (!expanded).toString());
-            detail.hidden = expanded;
-            item.classList.toggle('expanded', !expanded);
-          });
-
-          toggle.append(text, icon);
-          item.append(toggle, detail);
-        } else {
-          const title = document.createElement('span');
-          title.className = 'task-title';
-          title.textContent = task.title;
-          item.appendChild(title);
-        }
-
-        this.detailTasksList.appendChild(item);
+        this.detailTasksList.appendChild(this.createTaskListItem(entry.id, task, index));
       });
     }
 
@@ -341,5 +314,57 @@ export class HomeUI {
     this.settingsPanel.classList.toggle('hidden', isHome);
     this.homeTabButton.setAttribute('aria-pressed', isHome ? 'true' : 'false');
     this.settingsTabButton.setAttribute('aria-pressed', !isHome ? 'true' : 'false');
+  }
+
+  private createTaskListItem(archiveId: string, task: { title: string; detail: string | null }, index: number): HTMLLIElement {
+    const item = document.createElement('li');
+    item.className = 'task-item';
+
+    const titleText = task.title.trim() || '（タイトルなし）';
+
+    if (task.detail && task.detail.trim().length > 0) {
+      item.classList.add('has-detail');
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'task-toggle';
+      toggle.setAttribute('aria-expanded', 'false');
+
+      const label = document.createElement('span');
+      label.className = 'task-toggle-text';
+      label.textContent = titleText;
+
+      const icon = document.createElement('span');
+      icon.className = 'task-toggle-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '▼';
+
+      const detail = document.createElement('p');
+      detail.className = 'task-detail';
+      detail.textContent = task.detail;
+      detail.hidden = true;
+
+      const detailId = `task-detail-${archiveId}-${index}`;
+      detail.id = detailId;
+      toggle.setAttribute('aria-controls', detailId);
+
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        const nextExpanded = !expanded;
+        toggle.setAttribute('aria-expanded', nextExpanded.toString());
+        detail.hidden = !nextExpanded;
+        item.classList.toggle('expanded', nextExpanded);
+      });
+
+      toggle.append(label, icon);
+      item.append(toggle, detail);
+      return item;
+    }
+
+    const title = document.createElement('span');
+    title.className = 'task-title';
+    title.textContent = titleText;
+    item.appendChild(title);
+    return item;
   }
 }

@@ -7,6 +7,7 @@ export interface RecordResult {
   title: string;
   coins: number;
   tasks: RecordedTask[];
+  fallbackTask: RecordedTask | null;
 }
 
 type SliderElement = HTMLInputElement & { dataset: DOMStringMap };
@@ -135,18 +136,42 @@ export class RecordDialog {
 
   private buildResult(): RecordResult {
     const base = this.computeRecord();
-    const tasks = this.collectTasks();
-    return { ...base, tasks };
+    const { items, fallback } = this.collectTasks();
+    return { ...base, tasks: items, fallbackTask: fallback };
   }
 
-  private collectTasks(): RecordedTask[] {
+  private collectTasks(): { items: RecordedTask[]; fallback: RecordedTask | null } {
     const raw = this.taskInput.value ?? '';
-    return raw
-      .split(/\r?\n/)
+    const lines = raw.split(/\r?\n/);
+
+    let firstLine: string | null = null;
+    const remaining: string[] = [];
+
+    const parsed = lines
       .map((line) => line.trim())
-      .filter((line) => line.length > 0)
+      .filter((line) => {
+        if (line.length === 0) {
+          return false;
+        }
+        if (firstLine === null) {
+          firstLine = line;
+        } else {
+          remaining.push(line);
+        }
+        return true;
+      })
       .map((line) => this.parseTask(line))
       .filter((task): task is RecordedTask => task !== null);
+
+    const fallback: RecordedTask | null =
+      parsed.length > 0 || firstLine === null
+        ? null
+        : {
+            title: firstLine,
+            detail: remaining.length > 0 ? remaining.join('\n') : null
+          };
+
+    return { items: parsed, fallback };
   }
 
   private parseTask(line: string): RecordedTask | null {
