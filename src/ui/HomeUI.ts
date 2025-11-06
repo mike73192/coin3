@@ -84,15 +84,20 @@ export class HomeUI {
   }
 
   private handleRecordSubmit(result: RecordResult): void {
-    let tasksToRegister =
+    const sourceTasks =
       result.tasks.length > 0
         ? result.tasks
         : result.fallbackTask
           ? [result.fallbackTask]
           : [];
 
+    let tasksToRegister = sourceTasks.map((task) => ({
+      title: task.title,
+      detail: typeof task.detail === 'string' ? task.detail : task.detail ?? null
+    }));
+
     if (tasksToRegister.length === 0 && result.title.trim().length > 0) {
-      tasksToRegister = [{ title: result.title, detail: null }];
+      tasksToRegister = [{ title: result.title.trim(), detail: null }];
     }
 
     debugLogger.log('Record dialog submitted.', {

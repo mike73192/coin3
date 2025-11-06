@@ -145,7 +145,10 @@ export class GameStateManager {
       coins: this.capacity,
       createdAt: now.toISOString(),
       thumbnailUrl: this.generateThumbnail(title, now),
-      tasks: this.currentTasks.map((task) => ({ ...task }))
+      tasks: this.currentTasks.map((task) => ({
+        title: task.title,
+        detail: typeof task.detail === 'string' ? task.detail : task.detail ?? null
+      }))
     };
   }
 
@@ -231,9 +234,22 @@ export class GameStateManager {
       return null;
     }
 
-    const candidate = raw as { title?: unknown; detail?: unknown };
+    const candidate = raw as {
+      title?: unknown;
+      detail?: unknown;
+      description?: unknown;
+      content?: unknown;
+    };
     const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
-    const detail = typeof candidate.detail === 'string' ? candidate.detail.trim() : '';
+
+    let detail = '';
+    if (typeof candidate.detail === 'string') {
+      detail = candidate.detail.trim();
+    } else if (typeof candidate.description === 'string') {
+      detail = candidate.description.trim();
+    } else if (typeof candidate.content === 'string') {
+      detail = candidate.content.trim();
+    }
 
     if (title.length === 0 && detail.length === 0) {
       return null;
