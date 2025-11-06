@@ -84,26 +84,26 @@ export class HomeUI {
   }
 
   private handleRecordSubmit(result: RecordResult): void {
-    const sourceTasks =
+    const sourceTask =
       result.tasks.length > 0
-        ? result.tasks
-        : result.fallbackTask
-          ? [result.fallbackTask]
-          : [];
+        ? result.tasks[0]
+        : result.fallbackTask ?? null;
 
-    let tasksToRegister = sourceTasks.map((task) => ({
-      title: task.title,
-      detail: typeof task.detail === 'string' ? task.detail : task.detail ?? null
-    }));
+    let taskToRegister = sourceTask
+      ? {
+          title: sourceTask.title,
+          detail: typeof sourceTask.detail === 'string' ? sourceTask.detail : sourceTask.detail ?? null
+        }
+      : null;
 
-    if (tasksToRegister.length === 0 && result.title.trim().length > 0) {
-      tasksToRegister = [{ title: result.title.trim(), detail: null }];
+    if (!taskToRegister && result.title.trim().length > 0) {
+      taskToRegister = { title: result.title.trim(), detail: null };
     }
 
     debugLogger.log('Record dialog submitted.', {
       title: result.title,
       coins: result.coins,
-      taskCount: tasksToRegister.length,
+      taskRegistered: Boolean(taskToRegister),
       taskSource:
         result.tasks.length > 0
           ? 'tasks'
@@ -112,8 +112,8 @@ export class HomeUI {
             : 'titleFallback'
     });
     this.lastRecordTitle = result.title;
-    if (tasksToRegister.length > 0) {
-      gameState.registerTasks(tasksToRegister);
+    if (taskToRegister) {
+      gameState.registerTask(taskToRegister);
     }
     const available = gameState.getCapacity() - gameState.getCoinCount();
     const coins = Math.min(result.coins, Math.max(0, available));
