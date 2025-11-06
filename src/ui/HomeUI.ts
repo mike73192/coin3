@@ -364,52 +364,47 @@ export class HomeUI {
     item.className = 'task-item';
 
     const titleText = task.title.trim() || '（タイトルなし）';
+    const detailText = task.detail?.trim() ?? '';
+    const hasDetail = detailText.length > 0;
+    const contentText = hasDetail ? detailText : '（詳細なし）';
 
-    if (task.detail && task.detail.trim().length > 0) {
-      item.classList.add('has-detail');
+    item.classList.add(hasDetail ? 'has-detail' : 'no-detail');
 
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'task-toggle';
-      toggle.setAttribute('aria-expanded', 'false');
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'task-toggle';
+    toggle.setAttribute('aria-expanded', 'false');
 
-      const label = document.createElement('span');
-      label.className = 'task-toggle-text';
-      label.textContent = titleText;
+    const label = document.createElement('span');
+    label.className = 'task-toggle-text';
+    label.textContent = titleText;
 
-      const icon = document.createElement('span');
-      icon.className = 'task-toggle-icon';
-      icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = '▼';
+    const icon = document.createElement('span');
+    icon.className = 'task-toggle-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '▼';
 
-      const detail = document.createElement('p');
-      detail.className = 'task-detail';
-      detail.textContent = task.detail;
-      detail.hidden = true;
+    const detail = document.createElement('p');
+    detail.className = 'task-detail';
+    detail.textContent = contentText;
+    detail.hidden = true;
 
-      const detailId = `task-detail-${archiveId}-${index}`;
-      detail.id = detailId;
-      toggle.setAttribute('aria-controls', detailId);
+    const detailId = `task-detail-${archiveId}-${index}`;
+    detail.id = detailId;
+    toggle.setAttribute('aria-controls', detailId);
 
-      const toggleDetail = () => {
-        const expanded = toggle.getAttribute('aria-expanded') === 'true';
-        const nextExpanded = !expanded;
-        toggle.setAttribute('aria-expanded', nextExpanded.toString());
-        detail.hidden = !nextExpanded;
-        item.classList.toggle('expanded', nextExpanded);
-      };
+    const toggleDetail = () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      const nextExpanded = !expanded;
+      toggle.setAttribute('aria-expanded', nextExpanded.toString());
+      detail.hidden = !nextExpanded;
+      item.classList.toggle('expanded', nextExpanded);
+    };
 
-      toggle.addEventListener('click', toggleDetail);
+    toggle.addEventListener('click', toggleDetail);
 
-      toggle.append(label, icon);
-      item.append(toggle, detail);
-      return item;
-    }
-
-    const title = document.createElement('span');
-    title.className = 'task-title';
-    title.textContent = titleText;
-    item.appendChild(title);
+    toggle.append(label, icon);
+    item.append(toggle, detail);
     return item;
   }
 }
