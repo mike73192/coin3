@@ -144,144 +144,65 @@ export class RecordDialog {
     const raw = this.taskInput.value ?? '';
     const lines = raw.split(/\r?\n/);
 
-    const tasks: RecordedTask[] = [];
+    let firstLine: string | null = null;
+    const remaining: string[] = [];
 
-    let pendingTitle: string | null = null;
-    let detailLines: string[] = [];
-    let expectingDetail = false;
-    let detailStarted = false;
+    const parsed = lines
+      .map((line) => line.trim())
+      .filter((line) => {
+        if (line.length === 0) {
+          return false;
+        }
+        if (firstLine === null) {
+          firstLine = line;
+        } else {
+          remaining.push(line);
+        }
+        return true;
+      })
+      .map((line) => this.parseTask(line))
+      .filter((task): task is RecordedTask => task !== null);
 
-    const flushPending = () => {
-      if (pendingTitle === null) {
-        detailLines = [];
-        expectingDetail = false;
-        detailStarted = false;
-        return;
-      }
+    const fallback: RecordedTask | null =
+      parsed.length > 0 || firstLine === null
+        ? null
+        : {
+            title: firstLine,
+            detail: remaining.length > 0 ? remaining.join('\n') : null
+          };
 
-      const title = pendingTitle.trim();
-      const detailText = detailLines.map((line) => line.trim()).join('\n').trim();
+    return { items: parsed, fallback };
+  }
 
-      if (title.length === 0 && detailText.length === 0) {
-        pendingTitle = null;
-        detailLines = [];
-        expectingDetail = false;
-        detailStarted = false;
-        return;
+  private parseTask(line: string): RecordedTask | null {
+    if (!line) {
+      return null;
+    }
+
+    const separatorMatch = line.match(/^(.+?)[|｜:：](.+)$/);
+    if (separatorMatch) {
+      const title = separatorMatch[1]?.trim() ?? '';
+      const detail = separatorMatch[2]?.trim() ?? '';
+
+      if (title.length === 0 && detail.length === 0) {
+        return null;
       }
 
       if (title.length === 0) {
-        tasks.push({ title: detailText, detail: null });
-      } else {
-        tasks.push({ title, detail: detailText.length > 0 ? detailText : null });
+        return { title: detail, detail: null };
       }
-
-      pendingTitle = null;
-      detailLines = [];
-      expectingDetail = false;
-      detailStarted = false;
-    };
-
-    const bulletLikePattern = /^[\-–—*・●○◎◉◆◇■□▶▷»＞〉→⇒※•▪◦]/u;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.length === 0) {
-        flushPending();
-        continue;
-      }
-
-      const leadingWhitespace = line.length > line.trimStart().length;
-      const trimmedForMarker = line.trimStart();
-      const hasBulletMarker = bulletLikePattern.test(trimmedForMarker);
-
-      const separatorMatch = trimmed.match(/^(.+?)[|｜:：](.*)$/);
-      if (separatorMatch) {
-        flushPending();
-
-        const titlePart = separatorMatch[1]?.trim() ?? '';
-        const detailPartRaw = separatorMatch[2] ?? '';
-        const detailPart = detailPartRaw.trim();
-
-        if (titlePart.length === 0 && detailPart.length === 0) {
-          continue;
-        }
-
-        if (titlePart.length === 0) {
-          pendingTitle = detailPart;
-          detailLines = [];
-          expectingDetail = false;
-          detailStarted = false;
-          flushPending();
-          continue;
-        }
-
-        pendingTitle = titlePart;
-        detailLines = detailPart.length > 0 ? [detailPart] : [];
-        expectingDetail = detailPart.length === 0;
-        detailStarted = false;
-        continue;
-      }
-
-      if (pendingTitle === null) {
-        pendingTitle = trimmed;
-        detailLines = [];
-        expectingDetail = false;
-        detailStarted = false;
-        continue;
-      }
-
-      if (leadingWhitespace || hasBulletMarker || expectingDetail || detailStarted) {
-        detailLines.push(trimmed);
-        detailStarted = true;
-        expectingDetail = false;
-        continue;
-      }
-
-      if (detailLines.length === 0) {
-        detailLines.push(trimmed);
-        detailStarted = true;
-        expectingDetail = false;
-        continue;
-      }
-
-      flushPending();
-      pendingTitle = trimmed;
-      detailLines = [];
-      expectingDetail = false;
-      detailStarted = false;
-    }
-
-    flushPending();
-
-    if (tasks.length === 0) {
-      const fallbackText = raw.trim();
-      if (fallbackText.length === 0) {
-        return { items: [], fallback: null };
-      }
-
-      const fallbackLines = fallbackText
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-
-      if (fallbackLines.length === 0) {
-        return { items: [], fallback: null };
-      }
-
-      const [first, ...rest] = fallbackLines;
-      const detail = rest.join('\n');
 
       return {
-        items: [],
-        fallback: {
-          title: first,
-          detail: detail.length > 0 ? detail : null
-        }
+        title,
+        detail: detail.length > 0 ? detail : null
       };
     }
 
-    return { items: tasks, fallback: null };
+    const title = line.trim();
+    if (title.length === 0) {
+      return null;
+    }
+    return { title, detail: null };
   }
 
   private updatePreview(): void {
