@@ -142,139 +142,22 @@ export class RecordDialog {
 
   private collectTasks(): { items: RecordedTask[]; fallback: RecordedTask | null } {
     const raw = this.taskInput.value ?? '';
-    const lines = raw.split(/\r?\n/);
+    const normalized = raw.replace(/\r\n?/g, '\n');
+    const hasContent = normalized.trim().length > 0;
 
-    const tasks: RecordedTask[] = [];
+    if (!hasContent) {
+      return { items: [], fallback: null };
+    }
 
-    let pendingTitle: string | null = null;
-    let detailLines: string[] = [];
-    let expectingDetail = false;
-    let detailStarted = false;
-
-    const flushPending = () => {
-      if (pendingTitle === null) {
-        detailLines = [];
-        expectingDetail = false;
-        detailStarted = false;
-        return;
-      }
-
-      const title = pendingTitle.trim();
-      const detailText = detailLines.map((line) => line.trim()).join('\n').trim();
-
-      if (title.length === 0 && detailText.length === 0) {
-        pendingTitle = null;
-        detailLines = [];
-        expectingDetail = false;
-        detailStarted = false;
-        return;
-      }
-
-      if (title.length === 0) {
-        tasks.push({ title: detailText, detail: null });
-      } else {
-        tasks.push({ title, detail: detailText.length > 0 ? detailText : null });
-      }
-
-      pendingTitle = null;
-      detailLines = [];
-      expectingDetail = false;
-      detailStarted = false;
+    return {
+      items: [
+        {
+          title: '',
+          detail: normalized
+        }
+      ],
+      fallback: null
     };
-
-    const bulletLikePattern = /^[\-–—*・●○◎◉◆◇■□▶▷»＞〉→⇒※•▪◦]/u;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.length === 0) {
-        flushPending();
-        continue;
-      }
-
-      const leadingWhitespace = line.length > line.trimStart().length;
-      const trimmedForMarker = line.trimStart();
-      const hasBulletMarker = bulletLikePattern.test(trimmedForMarker);
-
-      const separatorMatch = trimmed.match(/^(.+?)[|｜:：](.*)$/);
-      if (separatorMatch) {
-        flushPending();
-
-        const titlePart = separatorMatch[1]?.trim() ?? '';
-        const detailPartRaw = separatorMatch[2] ?? '';
-        const detailPart = detailPartRaw.trim();
-
-        if (titlePart.length === 0 && detailPart.length === 0) {
-          continue;
-        }
-
-        if (titlePart.length === 0) {
-          pendingTitle = detailPart;
-          detailLines = [];
-          expectingDetail = false;
-          detailStarted = false;
-          flushPending();
-          continue;
-        }
-
-        pendingTitle = titlePart;
-        detailLines = detailPart.length > 0 ? [detailPart] : [];
-        expectingDetail = detailPart.length === 0;
-        detailStarted = false;
-        continue;
-      }
-
-      if (pendingTitle === null) {
-        pendingTitle = trimmed;
-        detailLines = [];
-        expectingDetail = false;
-        detailStarted = false;
-        continue;
-      }
-
-      if (leadingWhitespace || hasBulletMarker || expectingDetail || detailStarted) {
-        detailLines.push(trimmed);
-        detailStarted = detailStarted || leadingWhitespace || hasBulletMarker;
-        expectingDetail = false;
-        continue;
-      }
-
-      flushPending();
-      pendingTitle = trimmed;
-      detailLines = [];
-      expectingDetail = false;
-      detailStarted = false;
-    }
-
-    flushPending();
-
-    if (tasks.length === 0) {
-      const fallbackText = raw.trim();
-      if (fallbackText.length === 0) {
-        return { items: [], fallback: null };
-      }
-
-      const fallbackLines = fallbackText
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-
-      if (fallbackLines.length === 0) {
-        return { items: [], fallback: null };
-      }
-
-      const [first, ...rest] = fallbackLines;
-      const detail = rest.join('\n');
-
-      return {
-        items: [],
-        fallback: {
-          title: first,
-          detail: detail.length > 0 ? detail : null
-        }
-      };
-    }
-
-    return { items: tasks, fallback: null };
   }
 
   private updatePreview(): void {
