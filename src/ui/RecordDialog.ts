@@ -274,7 +274,7 @@ export class RecordDialog {
       };
     }
 
-    return { items: tasks.slice(0, 1), fallback: null };
+    return { items: tasks, fallback: null };
   }
 
   private updatePreview(): void {
