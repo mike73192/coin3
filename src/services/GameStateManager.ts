@@ -76,15 +76,17 @@ export class GameStateManager {
     this.pendingArchiveTitle = title;
   }
 
-  registerTask(task: RecordedTask): void {
-    const normalized = this.normalizeTask(task);
+  registerTasks(tasks: RecordedTask[]): void {
+    const normalized = tasks
+      .map((task) => this.normalizeTask(task))
+      .filter((task): task is RecordedTask => task !== null);
 
-    if (!normalized) {
+    if (normalized.length === 0) {
       return;
     }
 
-    this.currentTasks.push(normalized);
-    debugLogger.log('Task registered for current jar.', { title: normalized.title });
+    this.currentTasks.push(...normalized);
+    debugLogger.log('Tasks registered for current jar.', { count: normalized.length });
     this.emitTotals();
   }
 
