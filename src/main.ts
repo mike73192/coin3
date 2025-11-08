@@ -4,6 +4,7 @@ import { HomeUI } from '@/ui/HomeUI';
 import { gameState } from '@/services/GameStateManager';
 import { debugLogger } from '@/services/DebugLogger';
 import { appConfig } from '@/services/AppConfig';
+import '@/styles/main.css';
 
 const SCENE_KEY = 'MainScene';
 
