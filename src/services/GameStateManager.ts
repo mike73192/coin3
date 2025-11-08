@@ -5,6 +5,7 @@ import { userSettings } from '@/services/UserSettings';
 import { appConfig } from '@/services/AppConfig';
 
 const STORAGE_KEY = 'coin3-archives';
+const STATE_STORAGE_KEY = 'coin3-current-state';
 
 export interface GameStateEvents {
   coinsChanged: (count: number) => void;
@@ -26,6 +27,10 @@ export class GameStateManager {
   constructor(private capacity = appConfig.coins.jarCapacity) {
     this.capacity = Math.max(20, Math.min(500, Math.round(this.capacity)));
     this.archives = this.loadArchives();
+    const state = this.loadState();
+    this.coins = state.coins;
+    this.currentTasks = state.tasks;
+    this.pendingArchiveTitle = state.pendingTitle;
   }
 
   on<E extends EventKey>(event: E, handler: GameStateEvents[E]): void {
@@ -57,6 +62,7 @@ export class GameStateManager {
     this.emitter.emit('capacityChanged', this.capacity);
     debugLogger.log('Capacity updated.', { capacity: this.capacity });
     this.emitTotals();
+    this.persistState();
   }
 
   getArchives(): ArchiveEntry[] {
@@ -74,6 +80,7 @@ export class GameStateManager {
 
   setPendingTitle(title: string | null): void {
     this.pendingArchiveTitle = title;
+    this.persistState();
   }
 
   registerTask(task: RecordedTask): void {
@@ -86,6 +93,7 @@ export class GameStateManager {
     this.currentTasks.push(normalized);
     debugLogger.log('Task registered for current jar.', { title: normalized.title });
     this.emitTotals();
+    this.persistState();
   }
 
   addCoins(amount: number): { added: number; overflow: number; jarFilled: boolean } {
@@ -102,6 +110,7 @@ export class GameStateManager {
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coins added to jar.', { amount, added, overflow, total: this.coins });
     this.emitTotals();
+    this.persistState();
 
     if (this.coins >= this.capacity) {
       const entry = this.createArchiveEntry();
@@ -130,6 +139,7 @@ export class GameStateManager {
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coin count reset.', { value: this.coins });
     this.emitTotals();
+    this.persistState();
   }
 
   private createArchiveEntry(): ArchiveEntry {
@@ -176,6 +186,64 @@ export class GameStateManager {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.archives));
     } catch (error) {
       console.warn('Failed to persist archives', error);
+    }
+  }
+
+  private loadState(): { coins: number; tasks: RecordedTask[]; pendingTitle: string | null } {
+    const fallback = { coins: 0, tasks: [] as RecordedTask[], pendingTitle: null };
+    if (typeof localStorage === 'undefined') {
+      return fallback;
+    }
+
+    try {
+      const raw = localStorage.getItem(STATE_STORAGE_KEY);
+      if (!raw) {
+        return fallback;
+      }
+
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== 'object') {
+        return fallback;
+      }
+
+      const candidate = parsed as {
+        coins?: unknown;
+        tasks?: unknown;
+        pendingTitle?: unknown;
+      };
+
+      const coinValue =
+        typeof candidate.coins === 'number' && Number.isFinite(candidate.coins)
+          ? candidate.coins
+          : 0;
+      const coins = Math.max(0, Math.min(this.capacity, Math.round(coinValue)));
+      const tasks = this.normalizeStoredTasks(candidate.tasks);
+      const pendingTitle =
+        typeof candidate.pendingTitle === 'string' && candidate.pendingTitle.trim().length > 0
+          ? candidate.pendingTitle
+          : null;
+
+      return { coins, tasks, pendingTitle };
+    } catch (error) {
+      console.warn('Failed to load game state', error);
+      return fallback;
+    }
+  }
+
+  private persistState(): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
+    try {
+      const state = {
+        coins: this.coins,
+        tasks: this.currentTasks,
+        pendingTitle: this.pendingArchiveTitle
+      };
+      localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to persist game state', error);
     }
   }
 

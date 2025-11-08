@@ -50,6 +50,12 @@ const setupHomeUI = (): void => {
     onKeyboardCoin: (amount) => enqueueAddition(amount)
   });
   debugLogger.log('HomeUI ready.');
+
+  const existingCoins = gameState.getCoinCount();
+  if (existingCoins > 0 && scene) {
+    debugLogger.log('Restoring coin display after reload.', { coins: existingCoins });
+    scene.restoreCoinDisplay(existingCoins);
+  }
 };
 
 const bootstrapScene = (): void => {

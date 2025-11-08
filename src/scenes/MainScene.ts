@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { CoinFactory } from '@/services/CoinFactory';
 import { gameState } from '@/services/GameStateManager';
 import { appConfig } from '@/services/AppConfig';
+import { debugLogger } from '@/services/DebugLogger';
 import bottleImageUrl from '../../art/fb32b0195c07167f33583a0225f2b927-1.png';
 
 const BACKGROUND_COLOR = '#e9f1f9';
@@ -52,6 +53,7 @@ export class MainScene extends Phaser.Scene {
   private jarReadyResolvers: Array<() => void> = [];
   private queuePromise: Promise<void> = Promise.resolve();
   private jarReady = true;
+  private initialCoinsRestored = false;
 
   constructor() {
     super('MainScene');
@@ -75,6 +77,21 @@ export class MainScene extends Phaser.Scene {
         this.resolveJarReady();
       });
     });
+  }
+
+  restoreCoinDisplay(count: number): void {
+    if (this.initialCoinsRestored || count <= 0) {
+      return;
+    }
+
+    if (!this.coinFactory) {
+      debugLogger.log('Coin factory not ready. Skipping restore request.', { count });
+      return;
+    }
+
+    this.initialCoinsRestored = true;
+    debugLogger.log('Restoring coin display for existing jar progress.', { count });
+    void this.coinFactory.spawnCoins(count, 0);
   }
 
   enqueueCoins(amount: number): Promise<void> {
