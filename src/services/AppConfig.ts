@@ -42,12 +42,21 @@ export interface LoggingConfig {
   maxEntries: number;
 }
 
+export interface RemoteStorageConfig {
+  enabled: boolean;
+  baseUrl: string;
+  roomCode: string;
+  authToken: string | null;
+  pollIntervalMs: number;
+}
+
 export interface AppConfig {
   graphics: GraphicsConfig;
   physics: PhysicsConfig;
   coins: CoinConfig;
   ui: UIConfig;
   logging: LoggingConfig;
+  remoteStorage: RemoteStorageConfig;
 }
 
 type RawConfig = Record<string, Record<string, string>>;
@@ -89,6 +98,13 @@ const DEFAULT_CONFIG: AppConfig = {
   logging: {
     consoleEnabled: true,
     maxEntries: 500
+  },
+  remoteStorage: {
+    enabled: false,
+    baseUrl: '',
+    roomCode: '',
+    authToken: null,
+    pollIntervalMs: 15000
   }
 };
 
@@ -163,6 +179,7 @@ function buildConfig(raw: RawConfig): AppConfig {
   const coinsSection = raw['coins'] ?? {};
   const uiSection = raw['ui'] ?? {};
   const loggingSection = raw['logging'] ?? {};
+  const remoteSection = raw['remotestorage'] ?? {};
 
   const jarCapacity = Math.max(1, Math.round(parseNumber(coinsSection['jarCapacity'], DEFAULT_CONFIG.coins.jarCapacity)));
   const dropBatchSize = Math.max(1, Math.round(parseNumber(coinsSection['dropBatchSize'], DEFAULT_CONFIG.coins.dropBatchSize)));
@@ -213,7 +230,29 @@ function buildConfig(raw: RawConfig): AppConfig {
     logging: {
       consoleEnabled: parseBoolean(loggingSection['consoleEnabled'], DEFAULT_CONFIG.logging.consoleEnabled),
       maxEntries: Math.max(10, Math.round(parseNumber(loggingSection['maxEntries'], DEFAULT_CONFIG.logging.maxEntries)))
-    }
+    },
+    remoteStorage: buildRemoteStorageConfig(remoteSection)
+  };
+}
+
+function buildRemoteStorageConfig(section: Record<string, string>): RemoteStorageConfig {
+  const rawBaseUrl = parseString(section['baseUrl'], DEFAULT_CONFIG.remoteStorage.baseUrl);
+  const baseUrl = rawBaseUrl.trim().replace(/\/+$/, '');
+  const roomCode = parseString(section['roomCode'], DEFAULT_CONFIG.remoteStorage.roomCode).trim();
+  const authTokenRaw = parseString(section['authToken'], DEFAULT_CONFIG.remoteStorage.authToken ?? '').trim();
+  const pollInterval = Math.max(
+    5000,
+    Math.round(parseNumber(section['pollIntervalMs'], DEFAULT_CONFIG.remoteStorage.pollIntervalMs))
+  );
+  const enabledFlag = parseBoolean(section['enabled'], DEFAULT_CONFIG.remoteStorage.enabled);
+  const isConfigured = baseUrl.length > 0 && roomCode.length > 0;
+
+  return {
+    enabled: enabledFlag && isConfigured,
+    baseUrl,
+    roomCode,
+    authToken: authTokenRaw.length > 0 ? authTokenRaw : null,
+    pollIntervalMs: pollInterval
   };
 }
 
