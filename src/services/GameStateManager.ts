@@ -114,17 +114,20 @@ export class GameStateManager {
       return { added: 0, overflow: 0, jarFilled: false };
     }
 
-    const space = this.capacity - this.coins;
+    const space = Math.max(0, this.capacity - this.coins);
     const added = Math.min(space, amount);
     const overflow = Math.max(0, amount - added);
 
+    const wasAtCapacity = this.coins >= this.capacity;
     this.coins += added;
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coins added to jar.', { amount, added, overflow, total: this.coins });
     this.emitTotals();
     this.persistState();
 
-    if (this.coins >= this.capacity) {
+    const overflowedWithOutdatedCapacity = wasAtCapacity && this.coins > this.capacity && added === 0;
+
+    if (this.coins >= this.capacity && !overflowedWithOutdatedCapacity) {
       const entry = this.createArchiveEntry();
       this.archives = [entry, ...this.archives];
       this.persistArchives();
@@ -260,7 +263,7 @@ export class GameStateManager {
         typeof candidate.coins === 'number' && Number.isFinite(candidate.coins)
           ? candidate.coins
           : 0;
-      const coins = Math.max(0, Math.min(this.capacity, Math.round(coinValue)));
+      const coins = Math.max(0, Math.round(coinValue));
       const tasks = this.normalizeStoredTasks(candidate.tasks);
       const pendingTitle =
         typeof candidate.pendingTitle === 'string' && candidate.pendingTitle.trim().length > 0
@@ -315,7 +318,7 @@ export class GameStateManager {
       return;
     }
 
-    const coins = Math.max(0, Math.min(this.capacity, Math.round(typeof payload.coins === 'number' ? payload.coins : 0)));
+    const coins = Math.max(0, Math.round(typeof payload.coins === 'number' ? payload.coins : 0));
     const tasks = this.normalizeStoredTasks(payload.tasks as unknown);
     const pendingTitle =
       typeof payload.pendingTitle === 'string' && payload.pendingTitle.trim().length > 0
