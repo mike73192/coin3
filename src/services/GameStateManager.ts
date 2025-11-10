@@ -3,6 +3,7 @@ import type { ArchiveEntry, RecordedTask } from '@/models/archive';
 import { debugLogger } from '@/services/DebugLogger';
 import { userSettings } from '@/services/UserSettings';
 import { appConfig } from '@/services/AppConfig';
+import { syncService, type RemoteArchivesPayload, type RemoteGameStatePayload } from '@/services/SyncService';
 
 const STORAGE_KEY = 'coin3-archives';
 const STATE_STORAGE_KEY = 'coin3-current-state';
@@ -23,14 +24,25 @@ export class GameStateManager {
   private emitter = new Phaser.Events.EventEmitter();
   private pendingArchiveTitle: string | null = null;
   private currentTasks: RecordedTask[] = [];
+  private stateVersion: string | null = null;
+  private archivesVersion: string | null = null;
 
   constructor(private capacity = appConfig.coins.jarCapacity) {
     this.capacity = Math.max(20, Math.min(500, Math.round(this.capacity)));
-    this.archives = this.loadArchives();
+    const archivesData = this.loadArchives();
+    this.archives = archivesData.entries;
+    this.archivesVersion = archivesData.updatedAt;
     const state = this.loadState();
     this.coins = state.coins;
     this.currentTasks = state.tasks;
     this.pendingArchiveTitle = state.pendingTitle;
+    this.stateVersion = state.updatedAt;
+
+    if (syncService.isEnabled()) {
+      syncService.onStateUpdate((payload) => this.applyRemoteState(payload));
+      syncService.onArchivesUpdate((payload) => this.applyRemoteArchives(payload));
+      syncService.requestImmediatePull();
+    }
   }
 
   on<E extends EventKey>(event: E, handler: GameStateEvents[E]): void {
@@ -102,17 +114,20 @@ export class GameStateManager {
       return { added: 0, overflow: 0, jarFilled: false };
     }
 
-    const space = this.capacity - this.coins;
+    const space = Math.max(0, this.capacity - this.coins);
     const added = Math.min(space, amount);
     const overflow = Math.max(0, amount - added);
 
+    const wasAtCapacity = this.coins >= this.capacity;
     this.coins += added;
     this.emitter.emit('coinsChanged', this.coins);
     debugLogger.log('Coins added to jar.', { amount, added, overflow, total: this.coins });
     this.emitTotals();
     this.persistState();
 
-    if (this.coins >= this.capacity) {
+    const overflowedWithOutdatedCapacity = wasAtCapacity && this.coins > this.capacity && added === 0;
+
+    if (this.coins >= this.capacity && !overflowedWithOutdatedCapacity) {
       const entry = this.createArchiveEntry();
       this.archives = [entry, ...this.archives];
       this.persistArchives();
@@ -160,37 +175,68 @@ export class GameStateManager {
     };
   }
 
-  private loadArchives(): ArchiveEntry[] {
+  private loadArchives(): { entries: ArchiveEntry[]; updatedAt: string | null } {
+    const fallback = { entries: [] as ArchiveEntry[], updatedAt: null as string | null };
     if (typeof localStorage === 'undefined') {
-      return [];
+      return fallback;
     }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const list = JSON.parse(raw) as unknown;
-      if (!Array.isArray(list)) return [];
-      return list
-        .map((entry) => this.normalizeArchiveEntry(entry))
-        .filter((entry): entry is ArchiveEntry => entry !== null);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw) as unknown;
+
+      if (Array.isArray(parsed)) {
+        const entries = parsed
+          .map((entry) => this.normalizeArchiveEntry(entry))
+          .filter((entry): entry is ArchiveEntry => entry !== null);
+        return { entries, updatedAt: null };
+      }
+
+      if (parsed && typeof parsed === 'object') {
+        const container = parsed as { entries?: unknown; updatedAt?: unknown };
+        const entriesSource = Array.isArray(container.entries) ? container.entries : [];
+        const entries = entriesSource
+          .map((entry) => this.normalizeArchiveEntry(entry))
+          .filter((entry): entry is ArchiveEntry => entry !== null);
+        const updatedAt = typeof container.updatedAt === 'string' ? container.updatedAt : null;
+        return { entries, updatedAt };
+      }
+
+      return fallback;
     } catch (error) {
       console.warn('Failed to load archives', error);
-      return [];
+      return fallback;
     }
   }
 
-  private persistArchives(): void {
-    if (typeof localStorage === 'undefined') {
-      return;
+  private persistArchives(source: 'local' | 'remote' = 'local'): void {
+    if (source === 'local') {
+      this.archivesVersion = new Date().toISOString();
     }
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.archives));
-    } catch (error) {
-      console.warn('Failed to persist archives', error);
+
+    const payload = {
+      entries: this.archives.map((entry) => ({
+        ...entry,
+        tasks: entry.tasks.map((task) => ({ ...task }))
+      })),
+      updatedAt: this.archivesVersion ?? undefined
+    };
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.warn('Failed to persist archives', error);
+      }
+    }
+
+    if (source === 'local' && syncService.isEnabled()) {
+      void syncService.pushArchives(payload);
     }
   }
 
-  private loadState(): { coins: number; tasks: RecordedTask[]; pendingTitle: string | null } {
-    const fallback = { coins: 0, tasks: [] as RecordedTask[], pendingTitle: null };
+  private loadState(): { coins: number; tasks: RecordedTask[]; pendingTitle: string | null; updatedAt: string | null } {
+    const fallback = { coins: 0, tasks: [] as RecordedTask[], pendingTitle: null, updatedAt: null as string | null };
     if (typeof localStorage === 'undefined') {
       return fallback;
     }
@@ -210,40 +256,50 @@ export class GameStateManager {
         coins?: unknown;
         tasks?: unknown;
         pendingTitle?: unknown;
+        updatedAt?: unknown;
       };
 
       const coinValue =
         typeof candidate.coins === 'number' && Number.isFinite(candidate.coins)
           ? candidate.coins
           : 0;
-      const coins = Math.max(0, Math.min(this.capacity, Math.round(coinValue)));
+      const coins = Math.max(0, Math.round(coinValue));
       const tasks = this.normalizeStoredTasks(candidate.tasks);
       const pendingTitle =
         typeof candidate.pendingTitle === 'string' && candidate.pendingTitle.trim().length > 0
           ? candidate.pendingTitle
           : null;
+      const updatedAt = typeof candidate.updatedAt === 'string' ? candidate.updatedAt : null;
 
-      return { coins, tasks, pendingTitle };
+      return { coins, tasks, pendingTitle, updatedAt };
     } catch (error) {
       console.warn('Failed to load game state', error);
       return fallback;
     }
   }
 
-  private persistState(): void {
-    if (typeof localStorage === 'undefined') {
-      return;
+  private persistState(source: 'local' | 'remote' = 'local'): void {
+    if (source === 'local') {
+      this.stateVersion = new Date().toISOString();
     }
 
-    try {
-      const state = {
-        coins: this.coins,
-        tasks: this.currentTasks,
-        pendingTitle: this.pendingArchiveTitle
-      };
-      localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
-    } catch (error) {
-      console.warn('Failed to persist game state', error);
+    const payload = {
+      coins: this.coins,
+      tasks: this.currentTasks.map((task) => ({ ...task })),
+      pendingTitle: this.pendingArchiveTitle,
+      updatedAt: this.stateVersion ?? undefined
+    };
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.warn('Failed to persist game state', error);
+      }
+    }
+
+    if (source === 'local' && syncService.isEnabled()) {
+      void syncService.pushState(payload);
     }
   }
 
@@ -253,6 +309,56 @@ export class GameStateManager {
       tasks: this.getTotalTasks()
     };
     this.emitter.emit('totalsChanged', totals);
+  }
+
+  private applyRemoteState(payload: RemoteGameStatePayload): void {
+    const incomingVersion = this.parseTimestamp(payload.updatedAt);
+    const currentVersion = this.parseTimestamp(this.stateVersion);
+    if (incomingVersion <= currentVersion) {
+      return;
+    }
+
+    const coins = Math.max(0, Math.round(typeof payload.coins === 'number' ? payload.coins : 0));
+    const tasks = this.normalizeStoredTasks(payload.tasks as unknown);
+    const pendingTitle =
+      typeof payload.pendingTitle === 'string' && payload.pendingTitle.trim().length > 0
+        ? payload.pendingTitle
+        : null;
+
+    this.stateVersion = payload.updatedAt ?? new Date().toISOString();
+    this.coins = coins;
+    this.currentTasks = tasks;
+    this.pendingArchiveTitle = pendingTitle;
+
+    this.emitter.emit('coinsChanged', this.coins);
+    this.emitTotals();
+    this.persistState('remote');
+  }
+
+  private applyRemoteArchives(payload: RemoteArchivesPayload): void {
+    const incomingVersion = this.parseTimestamp(payload.updatedAt);
+    const currentVersion = this.parseTimestamp(this.archivesVersion);
+    if (incomingVersion <= currentVersion) {
+      return;
+    }
+
+    const entries = (Array.isArray(payload.entries) ? payload.entries : [])
+      .map((entry) => this.normalizeArchiveEntry(entry))
+      .filter((entry): entry is ArchiveEntry => entry !== null);
+
+    this.archives = entries;
+    this.archivesVersion = payload.updatedAt ?? new Date().toISOString();
+    this.persistArchives('remote');
+    this.emitter.emit('archivesUpdated', this.getArchives());
+    this.emitTotals();
+  }
+
+  private parseTimestamp(value: string | null | undefined): number {
+    if (!value) {
+      return 0;
+    }
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   private normalizeArchiveEntry(entry: unknown): ArchiveEntry | null {

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { appConfig } from '@/services/AppConfig';
+import { syncService, type RemoteSettingsPayload } from '@/services/SyncService';
 
 export interface UserSettings {
   jarCapacity: number;
@@ -42,9 +43,17 @@ const sanitizeSettings = (raw: Partial<UserSettings>): UserSettings => {
 class UserSettingsManager {
   private settings: UserSettings;
   private emitter = new Phaser.Events.EventEmitter();
+  private version: string | null = null;
 
   constructor() {
-    this.settings = this.loadSettings();
+    const loaded = this.loadSettings();
+    this.settings = loaded.settings;
+    this.version = loaded.updatedAt;
+
+    if (syncService.isEnabled()) {
+      syncService.onSettingsUpdate((payload) => this.applyRemoteSettings(payload));
+      syncService.requestImmediatePull();
+    }
   }
 
   getSettings(): UserSettings {
@@ -63,7 +72,7 @@ class UserSettingsManager {
     const merged = sanitizeSettings({ ...this.settings, ...update });
     if (!this.equals(this.settings, merged)) {
       this.settings = merged;
-      this.persistSettings();
+      this.persistSettings('local');
       this.emitter.emit('changed', this.getSettings());
     }
     return this.getSettings();
@@ -79,32 +88,84 @@ class UserSettingsManager {
     );
   }
 
-  private loadSettings(): UserSettings {
+  private loadSettings(): { settings: UserSettings; updatedAt: string | null } {
+    const fallback = { settings: { ...DEFAULT_SETTINGS }, updatedAt: null as string | null };
     if (typeof localStorage === 'undefined') {
-      return { ...DEFAULT_SETTINGS };
+      return fallback;
     }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        return { ...DEFAULT_SETTINGS };
+        return fallback;
       }
-      const parsed = JSON.parse(raw) as Partial<UserSettings>;
-      return sanitizeSettings({ ...DEFAULT_SETTINGS, ...parsed });
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && 'settings' in (parsed as Record<string, unknown>)) {
+        const container = parsed as { settings?: unknown; updatedAt?: unknown };
+        const settingsRaw =
+          container.settings && typeof container.settings === 'object'
+            ? (container.settings as Partial<UserSettings>)
+            : {};
+        const sanitized = sanitizeSettings({ ...DEFAULT_SETTINGS, ...settingsRaw });
+        const updatedAt = typeof container.updatedAt === 'string' ? container.updatedAt : null;
+        return { settings: sanitized, updatedAt };
+      }
+      const legacy = sanitizeSettings({ ...DEFAULT_SETTINGS, ...(parsed as Partial<UserSettings>) });
+      return { settings: legacy, updatedAt: null };
     } catch (error) {
       console.warn('Failed to load user settings', error);
-      return { ...DEFAULT_SETTINGS };
+      return fallback;
     }
   }
 
-  private persistSettings(): void {
-    if (typeof localStorage === 'undefined') {
+  private persistSettings(source: 'local' | 'remote' = 'local'): void {
+    if (source === 'local') {
+      this.version = new Date().toISOString();
+    }
+
+    const payload = {
+      settings: { ...this.settings },
+      updatedAt: this.version ?? undefined
+    };
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.warn('Failed to store user settings', error);
+      }
+    }
+
+    if (source === 'local' && syncService.isEnabled()) {
+      void syncService.pushSettings(payload);
+    }
+  }
+
+  private applyRemoteSettings(payload: RemoteSettingsPayload): void {
+    const incomingVersion = this.parseTimestamp(payload.updatedAt);
+    const currentVersion = this.parseTimestamp(this.version);
+    if (incomingVersion <= currentVersion) {
       return;
     }
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
-    } catch (error) {
-      console.warn('Failed to store user settings', error);
+
+    const sanitized = sanitizeSettings({ ...DEFAULT_SETTINGS, ...payload.settings });
+    if (this.equals(this.settings, sanitized)) {
+      this.version = payload.updatedAt ?? new Date().toISOString();
+      this.persistSettings('remote');
+      return;
     }
+
+    this.settings = sanitized;
+    this.version = payload.updatedAt ?? new Date().toISOString();
+    this.persistSettings('remote');
+    this.emitter.emit('changed', this.getSettings());
+  }
+
+  private parseTimestamp(value: string | null | undefined): number {
+    if (!value) {
+      return 0;
+    }
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 }
 
