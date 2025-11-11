@@ -31,6 +31,59 @@ npm run build
 - コインが 100 枚に達すると瓶が満杯になり、成果が棚に保存されます。棚は 2 行 × 3 列でページ切り替えが可能です。
 - 成果はローカルストレージに保存され、次回アクセス時も表示されます。
 
+## オンライン共有（BaaS を使う場合）
+
+友達と成果を共有したい場合は、`config file.tet` の `[remoteStorage]` セクションでオンライン同期を有効化します。ここでは Firebase や Supabase などの BaaS（Backend as a Service）を利用する手順を初心者向けにまとめました。
+
+### 事前に理解しておくポイント
+
+- `enabled` を `true` にすると、ゲームは指定した REST API に対してデータの保存／取得を行います。
+- `baseUrl` は BaaS が用意する REST API のエンドポイント（例: `https://xxxx.supabase.co/rest/v1/coin3`）を指定します。末尾に `/` は不要です。
+- `roomCode` は共有したいグループの識別子です。同じコードを設定したプレイヤー同士でデータを共有できます。
+- `authToken` はサービスから発行される API キーや Bearer トークンを入力します。認証不要なサービスなら空欄で構いません。
+
+### Supabase を例にした設定手順
+
+1. **プロジェクトの作成**
+   1. [Supabase](https://supabase.com/) にサインアップし、新しいプロジェクトを作成します。無料プランで十分です。
+   2. プロジェクトを作成すると `Project URL`（例: `https://xxxx.supabase.co`）と `anon public` API キーが表示されます。これらを控えておきます。
+
+2. **テーブルの準備**
+   1. Supabase の「Table editor」で `coin3_rooms` のようなテーブルを作成し、以下のカラムを用意します。
+      - `room_code` (text, Primary key)
+      - `payload` (jsonb)
+      - `updated_at` (timestamp、デフォルト値に `now()` を設定)
+   2. RLS（Row Level Security）をオンにし、匿名ユーザーが自分の `room_code` に対して `select` と `upsert`（`insert` + `update`）できるようにポリシーを追加します。公式ドキュメントのサンプルポリシーをそのまま利用できます。
+
+3. **REST エンドポイントの確認**
+   - Supabase ではテーブル名がそのまま REST エンドポイントになります。例: `https://xxxx.supabase.co/rest/v1/coin3_rooms`
+   - `room_code` をクエリパラメーターで指定することで、対象レコードを取得できます。例: `...?room_code=eq.1122`
+
+4. **config file.tet の設定**
+
+   ```ini
+   [remoteStorage]
+   enabled = true
+   baseUrl = https://xxxx.supabase.co/rest/v1/coin3_rooms
+   roomCode = 1122          # 友達と共有したいコード
+   authToken = sbp_xxxxxxx  # Supabase の anon public キーをそのまま記入
+   pollIntervalMs = 15000   # 必要に応じてポーリング間隔を変更
+   ```
+
+   Supabase の REST API は `apikey` と `Authorization: Bearer` の両方に同じトークンを送る必要があります。本ゲームでは自動的に `Authorization` ヘッダーに設定されるため、同じ値を `authToken` に書くだけで利用できます。
+
+5. **CORS の許可**
+   - Supabase ダッシュボードの「Authentication > Policies > Redirect URLs」で、ゲームをホストするオリジン（例: `http://localhost:5173` やデプロイ先の URL）を追加します。
+
+6. **テスト**
+   - 双方が同じ設定ファイルを使ってゲームを起動し、片方がコインを追加したら数十秒以内にもう一方にも反映されることを確認します。
+
+### その他の BaaS を使う場合
+
+- Firebase Realtime Database や Appwrite などでも同様に、REST API URL とトークン、部屋コードに相当するキーを設定すれば共有できます。
+- サービス固有の認証方法や CORS 設定が必要になることが多いため、公式ドキュメントも併せて参照してください。
+
+
 ## ファイル構成と役割
 
 | 主要ファイル | 役割 | 主な依存先 / イベント |
