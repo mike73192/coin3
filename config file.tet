@@ -67,9 +67,9 @@ maxEntries = 500
 
 [remoteStorage]
 # 友人と共有するためのオンライン保存機能を使うか。
-enabled = false
+enabled = true
 # REST API のベースURL（例: https://example.com/api/coin3）。末尾のスラッシュは不要。
-baseUrl = https://example.com/api/coin3
+baseUrl = https://wclzqmawnuwtkwxucolw.supabase.co/functions/v1/dynamic-service
 # 共有用の部屋IDやドキュメント名。英数字のみを推奨。
 roomCode = 1122
 # 認証が必要な場合のアクセストークン（Bearerトークン）。不要なら空欄のままでOK。
