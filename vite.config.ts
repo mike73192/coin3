@@ -1,20 +1,22 @@
-import { fileURLToPath, URL } from 'node:url';
+// vite.config.ts
+import { defineConfig, loadEnv } from "vite";
+import { fileURLToPath } from "node:url";
+import { URL } from "node:url";
 
-import { defineConfig } from 'vite';
+export default defineConfig(({ mode }) => {
+  // Viteはクライアント側で import.meta.env を使うので、ここで env は必須ではないけど、
+  // 読みたい人向けに置いとく（未使用でもOK）
+  loadEnv(mode, process.cwd(), "VITE_");
 
-export default defineConfig({
-  base: './',
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  },
-  server: {
-    host: '0.0.0.0',
-    port: 5173
-  },
-  preview: {
-    host: '0.0.0.0',
-    port: 4173
-  }
+  return {
+    server: {
+      host: true,
+      // port: 5173, // 必要なら
+    },
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)), // ← これで @ が src を指す
+      },
+    },
+  };
 });
