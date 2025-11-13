@@ -30,6 +30,15 @@ Deno.serve(async (req) => {
 
   const { pathname } = new URL(req.url);
   const segments = pathname.split('/').filter(Boolean);
+
+  // Supabase Edge Function URLs include `/functions/v1/:functionName`.
+  // Strip this prefix so the handler can work with the expected
+  // `/rooms/:roomCode/:resource` shape after deployment.
+  if (segments[0] === 'functions' && segments[1] === 'v1') {
+    segments.shift();
+    segments.shift();
+  }
+
   if (segments[0] === 'coin3') {
     segments.shift();
   }
