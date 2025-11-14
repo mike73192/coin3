@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
   loadEnv(mode, process.cwd(), "VITE_");
 
   return {
+    // GitHub Pages などのサブパス配信でもアセットが 404 にならないよう
+    // 相対パスでビルドされる base を指定しておく
+    base: './',
     server: {
       host: true,
       // port: 5173, // 必要なら
