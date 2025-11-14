@@ -6,6 +6,7 @@ import { userSettings } from '@/services/UserSettings';
 import { RecordDialog, type RecordResult } from '@/ui/RecordDialog';
 import { SettingsUI } from '@/ui/SettingsUI';
 import { appConfig } from '@/services/AppConfig';
+import { DEFAULT_ARCHIVE_THUMBNAIL } from '@/constants/assets';
 
 interface HomeUIOptions {
   onRecord: (coins: number) => void;
@@ -236,7 +237,7 @@ export class HomeUI {
 
       if (entry) {
         const img = document.createElement('img');
-        img.src = entry.thumbnailUrl || '/default-thumb.svg';
+        img.src = entry.thumbnailUrl || DEFAULT_ARCHIVE_THUMBNAIL;
         img.alt = `${entry.title}のサムネイル`;
 
         const title = document.createElement('div');

@@ -4,6 +4,7 @@ import { debugLogger } from '@/services/DebugLogger';
 import { userSettings } from '@/services/UserSettings';
 import { appConfig } from '@/services/AppConfig';
 import { syncService, type RemoteArchivesPayload, type RemoteGameStatePayload } from '@/services/SyncService';
+import { DEFAULT_ARCHIVE_THUMBNAIL } from '@/constants/assets';
 
 const STORAGE_KEY = 'coin3-archives';
 const STATE_STORAGE_KEY = 'coin3-current-state';
@@ -374,7 +375,10 @@ export class GameStateManager {
     const coins = typeof partial.coins === 'number' && Number.isFinite(partial.coins)
       ? partial.coins
       : this.capacity;
-    const thumbnailUrl = typeof partial.thumbnailUrl === 'string' ? partial.thumbnailUrl : '/default-thumb.svg';
+    const thumbnailUrl =
+      typeof partial.thumbnailUrl === 'string' && partial.thumbnailUrl.trim().length > 0
+        ? partial.thumbnailUrl
+        : DEFAULT_ARCHIVE_THUMBNAIL;
     const tasks = this.normalizeStoredTasks(partial.tasks);
 
     return {
@@ -490,7 +494,7 @@ export class GameStateManager {
     canvas.height = 120;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      return '/default-thumb.svg';
+      return DEFAULT_ARCHIVE_THUMBNAIL;
     }
     const hue = (now.getHours() * 15 + now.getMinutes()) % 360;
     const gradient = ctx.createLinearGradient(0, 120, 160, 0);
