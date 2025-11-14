@@ -1,6 +1,7 @@
 import type { ArchiveEntry, RecordedTask } from '@/models/archive';
 import { appConfig } from '@/services/AppConfig';
 import type { UserSettings } from '@/services/UserSettings';
+import { DEFAULT_ARCHIVE_THUMBNAIL } from '@/constants/assets';
 
 export interface RemoteGameStatePayload {
   coins: number;
@@ -280,7 +281,10 @@ export class SyncService {
           title: entry?.title ?? '',
           coins: typeof entry?.coins === 'number' ? entry.coins : 0,
           createdAt: typeof entry?.createdAt === 'string' ? entry.createdAt : new Date().toISOString(),
-          thumbnailUrl: typeof entry?.thumbnailUrl === 'string' ? entry.thumbnailUrl : '/default-thumb.svg',
+          thumbnailUrl:
+            typeof entry?.thumbnailUrl === 'string' && entry.thumbnailUrl.trim().length > 0
+              ? entry.thumbnailUrl
+              : DEFAULT_ARCHIVE_THUMBNAIL,
           tasks: Array.isArray(entry?.tasks)
             ? entry.tasks.map((task) => ({
                 title: task?.title ?? '',
