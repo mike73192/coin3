@@ -19,9 +19,15 @@ index 8d1f25298da61b266a1c9dc934281cc3bb098d59..a4cd3a40832daf6825c04d1fc3f9401f
  npm run build
  ```
  
- `dist/` 配下に静的ファイルが生成されます。
- 
- ## 遊び方
+`dist/` 配下に静的ファイルが生成されます。
+
+## 環境変数について
+
+- Vite の設定 (`vite.config.ts`) では `loadEnv(..., "VITE_")` を呼んでいますが、現状のアプリでは `import.meta.env` を参照していません。そのため `.env.local` は必須ではなく、消しても動作に影響はありません。
+- オンライン共有に必要な URL やトークンはすべて `config file.tet` の `[remoteStorage]` セクションで管理します。ブラウザに読み込ませたい値はそちらを書き換えてください。
+- Supabase Edge Function 用の秘密情報 (`supabase/.env.coin3` など) は引き続き Supabase CLI で参照されるため、必要に応じてローカルに保持してください。
+
+## 遊び方
  
  - Enter キーでコインを 1 枚落とせます。
  - 「記録」ボタンからタイトルとスライダーを設定すると、評価に応じたコインが追加されます（1 回につき最大 15 枚）。
