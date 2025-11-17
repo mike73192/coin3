@@ -69,10 +69,10 @@ maxEntries = 500
 # 友人と共有するためのオンライン保存機能を使うか。
 enabled = true
 # REST API のベースURL（例: https://example.com/api/coin3）。末尾のスラッシュは不要。
-baseUrl = https://wclzqmawnuwtkwxucolw.supabase.co/functions/v1/dynamic-service
+baseUrl = https://wclzqmawnuwtkwxucolw.supabase.co/functions/v1/coin3
 # 共有用の部屋IDやドキュメント名。英数字のみを推奨。
 roomCode = mycoin1122
 # 認証が必要な場合のアクセストークン（Bearerトークン）。不要なら空欄のままでOK。
-authToken =
+authToken = 37q&^M5^e@dQ#JqX3$
 # 変更を取り込むためのポーリング間隔（ミリ秒）。
 pollIntervalMs = 15000
