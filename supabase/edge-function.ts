@@ -16,6 +16,12 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false }
 });
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type'
+};
+
 const columns: ColumnMap = {
   state: { payload: 'state_payload', updatedAt: 'state_updated_at' },
   archives: { payload: 'archives_payload', updatedAt: 'archives_updated_at' },
@@ -23,6 +29,10 @@ const columns: ColumnMap = {
 };
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   const authCheck = authorize(req.headers.get('Authorization'));
   if (!authCheck.ok) {
     return jsonResponse({ error: 'Unauthorized' }, authCheck.status);
@@ -144,6 +154,6 @@ function extractUpdatedAt(body: unknown): string {
 function jsonResponse(data: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', ...headers }
+    headers: { 'Content-Type': 'application/json', ...corsHeaders, ...headers }
   });
 }

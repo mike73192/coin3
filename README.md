@@ -81,6 +81,15 @@ index 8d1f25298da61b266a1c9dc934281cc3bb098d59..a4cd3a40832daf6825c04d1fc3f9401f
 +6. **テスト**
 +   - 双方が同じ設定ファイルを使ってゲームを起動し、片方がコインを追加したら数十秒以内にもう一方にも反映されることを確認します。
 +
+### GitHub Pages で通信状況を確認する手順
+
+1. GitHub Pages にデプロイしたページを開き、ブラウザのデベロッパーツールを表示します（Chrome なら `F12` →「Network」タブ）。
+2. 画面上でコインを追加したり記録を保存したりして、通信が発生するタイミングを作ります。
+3. Network タブで `rooms` や `state` を検索ボックスに入力すると、`/rooms/<roomCode>/state` などの `GET` / `PUT` リクエストだけに絞り込めます。
+4. 正常に通信できているリクエストは `Status` 列が `200`（GET）や `204`（PUT）になり、`Response` 欄に JSON データが表示されます。
+5. `404 Not Found` が出ている場合は `baseUrl` や `roomCode` が誤っている可能性が高く、`401 Unauthorized` の場合は `authToken`（Supabase の anon key や `COIN3_FUNCTION_TOKEN` など）が一致していないことが原因です。`CORS error` が出るときは Supabase の Redirect/CORS 許可リストに GitHub Pages の URL を追加してください。
+6. これらのエラーが無く数十秒ごとに `GET` / `PUT` が成功していれば、GitHub Pages 版から BaaS へ接続できています。
+
 +### その他の BaaS を使う場合
 +
 +- Firebase Realtime Database や Appwrite などでも同様に、REST API URL とトークン、部屋コードに相当するキーを設定すれば共有できます。
