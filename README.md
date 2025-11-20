@@ -81,6 +81,17 @@ index 8d1f25298da61b266a1c9dc934281cc3bb098d59..a4cd3a40832daf6825c04d1fc3f9401f
 +6. **テスト**
 +   - 双方が同じ設定ファイルを使ってゲームを起動し、片方がコインを追加したら数十秒以内にもう一方にも反映されることを確認します。
 +
++#### Edge Function のコードについて
++
++`supabase/edge-function.ts` に、上記 REST エンドポイントをラップするための Edge Function 実装を同梱しています。以下の点だけ確認しておけば、GitHub Pages などの公開オリジンからも安全に呼び出せます。
++
++1. **サービスロールキーの使用** — Edge Function では `SUPABASE_SERVICE_ROLE_KEY` を使って `createClient` し、`coin3_rooms` テーブルへの読み書きを行います。キーは Supabase 側の Secrets に保存され、クライアントには一切漏れません。
++2. **共有トークンの検証** — `COIN3_FUNCTION_TOKEN` を設定すると、`Authorization: Bearer ...` が一致したリクエストのみを許可します。`config file.tet` の `[remoteStorage].authToken` と同じ値にしておくと、ブラウザからの `GET/PUT` だけが通ります。
++3. **CORS / preflight 対応** — `supabase/edge-function.ts` の先頭で `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers` をまとめた `corsHeaders` を定義し、`OPTIONS` メソッドには `204` を返した上で `jsonResponse` でも常に同じヘッダーを付与しています。Supabase 側の Redirect URL や Allowed Headers を整備した状態でデプロイすれば、冒頭の CORS エラーは解消されます。
++4. **サニタイズ済みルーティング** — Edge Function 側では `/functions/v1/coin3` のプレフィックスを自動で取り除き、`/rooms/:roomCode/:resource`（resource は `state` / `archives` / `settings` のみ）にマッチした場合だけハンドラーへ流します。
++
++コードをカスタマイズしたい場合は `supabase/edge-function.ts` を編集し、`supabase functions deploy coin3 --no-verify-jwt` などで再デプロイしてください。
++
 ### GitHub Pages で通信状況を確認する手順
 
 1. GitHub Pages にデプロイしたページを開き、ブラウザのデベロッパーツールを表示します（Chrome なら `F12` →「Network」タブ）。
@@ -90,12 +101,46 @@ index 8d1f25298da61b266a1c9dc934281cc3bb098d59..a4cd3a40832daf6825c04d1fc3f9401f
 5. `404 Not Found` が出ている場合は `baseUrl` や `roomCode` が誤っている可能性が高く、`401 Unauthorized` の場合は `authToken`（Supabase の anon key や `COIN3_FUNCTION_TOKEN` など）が一致していないことが原因です。`CORS error` が出るときは Supabase の Redirect/CORS 許可リストに GitHub Pages の URL を追加してください。
 6. これらのエラーが無く数十秒ごとに `GET` / `PUT` が成功していれば、GitHub Pages 版から BaaS へ接続できています。
 
-+### その他の BaaS を使う場合
-+
-+- Firebase Realtime Database や Appwrite などでも同様に、REST API URL とトークン、部屋コードに相当するキーを設定すれば共有できます。
-+- サービス固有の認証方法や CORS 設定が必要になることが多いため、公式ドキュメントも併せて参照してください。
-+
-+
+#### 「Response to preflight request doesn't pass access control check」エラーの対処
+
+GitHub Pages などの公開オリジンから Supabase Edge Function を呼び出すとき、`Authorization` ヘッダーを付与した `GET/PUT` リクエストはブラウザによって事前確認（preflight）されます。preflight は `OPTIONS https://<project>.supabase.co/functions/v1/coin3/...` という形のリクエストで、ここが `200`/`204` 以外を返すと Chrome のコンソールに次のようなエラーが出続けます。
+
+```
+Access to fetch at 'https://<project>.supabase.co/functions/v1/coin3/rooms/<roomCode>/state' from origin 'https://<username>.github.io' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: It does not have HTTP ok status.
+```
+
+この場合は「Edge Function まで preflight が届かず、インフラ側で遮断されている」ことがほとんどです。以下を順に確認してください。
+
+1. **Authentication > Policies > Redirect URLs** に `https://<username>.github.io` やカスタムドメインを追加し、`Save` 後に数分待つ。
+2. Supabase プロジェクト設定の **API > Allowed Headers** に `authorization` が含まれているか確認し、無い場合は追加して保存する。
+3. `supabase functions deploy coin3 --no-verify-jwt ...` を実行した際、ダッシュボードの **Edge Functions > Settings** で `No JWT verification` になっているか確認する。誤って JWT 検証を有効にすると preflight が 401 を返します。
+
+いずれかを修正すると Network タブの `OPTIONS /rooms/...` が `204` で返るようになり、その後の `GET` / `PUT` も `200` / `204` で完了するようになります。
+
+preflight が依然として `404` や `CORS error` で失敗する場合は、以下の切り分けを行ってください。
+
+1. **Edge Function の動作確認** — ターミナルから次のように `OPTIONS` を叩き、`204` と `Access-Control-Allow-*` が返るか確認します。
+
+   ```bash
+   curl -i -X OPTIONS \
+     -H "Origin: https://<username>.github.io" \
+     -H "Access-Control-Request-Method: GET" \
+     -H "Access-Control-Request-Headers: Authorization, Content-Type" \
+     "https://<project>.supabase.co/functions/v1/coin3/rooms/<roomCode>/state"
+   ```
+
+   ここで `404` が返る場合は **Edge Function 未デプロイ/URL タイプミス**（`functions deploy coin3 --no-verify-jwt` の再実行や `baseUrl` のスペル確認）を疑います。`401` の場合は `COIN3_FUNCTION_TOKEN` と `Authorization: Bearer` の値が一致していない可能性が高いです。
+
+2. **Dashboard での CORS 許可リスト確認** — Redirect URL と Allowed Headers が保存されているかを再確認し、数分経過して反映されたのちに再度 `curl` とブラウザの preflight を試します。
+
+3. **`config file.tet` の `baseUrl` 再確認** — `https://<project>.supabase.co/functions/v1/coin3` に誤って末尾スラッシュや別のホスト名を付与していないか確認します。ここが一致していないと preflight も本体リクエストも 404 になります。
+
+### その他の BaaS を使う場合
+
+- Firebase Realtime Database や Appwrite などでも同様に、REST API URL とトークン、部屋コードに相当するキーを設定すれば共有できます。
+- サービス固有の認証方法や CORS 設定が必要になることが多いため、公式ドキュメントも併せて参照してください。
+
+
  ## ファイル構成と役割
  
  | 主要ファイル | 役割 | 主な依存先 / イベント |
