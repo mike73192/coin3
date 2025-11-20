@@ -74,5 +74,6 @@ baseUrl = https://wclzqmawnuwtkwxucolw.supabase.co/functions/v1/coin3
 roomCode = mycoin1122
 # 認証が必要な場合のアクセストークン（Bearerトークン）。不要なら空欄のままでOK。
 authToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbHpxbWF3bnV3dGt3eHVjb2x3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4NzY5NTAsImV4cCI6MjA3ODQ1Mjk1MH0.mXahpDclsHDoi5R4QHM_wLYcWlFFSp6GGo5qusaJTfk
+
 # 変更を取り込むためのポーリング間隔（ミリ秒）。
 pollIntervalMs = 15000

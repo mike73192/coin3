@@ -3,3 +3,5 @@ dist/
 *.log
 src/**/*.js
 src/**/*.js.map
+.env.local
+supabase/.env*
